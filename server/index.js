@@ -3,7 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import dotenv from "dotenv";
-import { connectDB } from "./config/db.js";
+import { connectDB } from "./src/config/db.js";
 
 
 dotenv.config();
@@ -26,6 +26,18 @@ app.use(morgan("dev"));
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, message: "API is running" });
 });
+
+import warehouseRoutes from "./src/routes/warehouseRoutes.js";
+import categoryRoutes from "./src/routes/categoryRoutes.js";
+import productRoutes from "./src/routes/productRoutes.js";
+import inventoryRoutes from "./src/routes/inventoryRoutes.js";
+
+
+app.use("/api/warehouses", warehouseRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/inventory", inventoryRoutes);
+
 
 // Start
 const PORT = process.env.PORT || 5000;
