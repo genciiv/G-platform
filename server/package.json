@@ -3,15 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
-
   "scripts": {
-  "dev": "nodemon src/index.js",
-  "start": "node src/index.js"
-},
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js"
+  },
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
