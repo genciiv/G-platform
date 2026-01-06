@@ -1,16 +1,12 @@
 import Warehouse from "../models/Warehouse.js";
 
-export async function createWarehouse(req, res) {
+// GET /api/warehouses
+export const listWarehouses = async (req, res) => {
   try {
-    const { name, code, address } = req.body;
-    const w = await Warehouse.create({ name, code, address });
-    res.status(201).json(w);
-  } catch (e) {
-    res.status(400).json({ message: e.message });
+    const warehouses = await Warehouse.find().sort({ createdAt: -1 });
+    return res.json(warehouses);
+  } catch (err) {
+    console.error("❌ listWarehouses error:", err.message);
+    return res.status(500).json({ message: "Failed to fetch warehouses" });
   }
-}
-
-export async function listWarehouses(req, res) {
-  const rows = await Warehouse.find().sort({ createdAt: -1 });
-  res.json(rows);
-}
+};
