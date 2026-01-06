@@ -1,0 +1,51 @@
+.muted { color: #666; }
+
+.grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.card {
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+}
+
+.card__title {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.card__price {
+  margin-bottom: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.old { text-decoration: line-through; color: #888; }
+.new { font-weight: 800; }
+
+.btn {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #111;
+  background: #111;
+  color: #fff;
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 820px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 520px) {
+  .grid { grid-template-columns: 1fr; }
+}

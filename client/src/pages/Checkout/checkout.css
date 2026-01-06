@@ -1,0 +1,33 @@
+.box {
+  margin-top: 14px;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+  max-width: 520px;
+}
+
+.sum { margin-bottom: 12px; }
+.muted { color: #666; }
+
+.form { display: grid; gap: 10px; }
+label { display: grid; gap: 6px; font-size: 14px; }
+
+input {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  outline: none;
+}
+
+.err { color: #c00; margin: 6px 0 0; }
+
+.btn {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #111;
+  background: #111;
+  color: #fff;
+  cursor: pointer;
+}
