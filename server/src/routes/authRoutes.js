@@ -1,14 +1,12 @@
 import { Router } from "express";
-import { login, logout, me, adminSeed } from "../controllers/authController.js";
-import { requireAuth } from "../middleware/auth.js";
+import { adminSeed, login, logout, me } from "../controllers/authController.js";
+import { requireAuth, requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
 
+router.get("/seed-admin", adminSeed); // krijon admin nga .env
 router.post("/login", login);
 router.post("/logout", logout);
-router.get("/me", requireAuth, me);
-
-// opsionale (vetëm lokalisht): krijon admin nga env
-router.post("/seed-admin", adminSeed);
+router.get("/me", requireAuth, requireAdmin, me);
 
 export default router;

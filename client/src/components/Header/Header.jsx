@@ -1,42 +1,35 @@
-import { Link, useNavigate } from "react-router-dom";
-import { useCart } from "../../context/cartContext.jsx";
-import "./header.css";
-import { useState } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useCart } from "../../context/cart.jsx";
+import "./Header.css";
 
 export default function Header() {
-  const { cartCount } = useCart();
-  const [q, setQ] = useState("");
+  const { count } = useCart();
   const navigate = useNavigate();
 
-  function onSearch(e) {
+  const onSearch = (e) => {
     e.preventDefault();
-    const query = q.trim();
-    navigate(`/products?q=${encodeURIComponent(query)}`);
-  }
+    const q = e.target.q.value.trim();
+    navigate(q ? `/products?q=${encodeURIComponent(q)}` : "/products");
+  };
 
   return (
-    <header className="hdr">
-      <div className="container hdr__row">
-        <Link to="/" className="hdr__logo">
+    <header className="header">
+      <div className="header__inner">
+        <Link className="logo" to="/">
           G-App
         </Link>
 
-        <form className="hdr__search" onSubmit={onSearch}>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Kërko produkte..."
-          />
+        <form className="search" onSubmit={onSearch}>
+          <input name="q" placeholder="Kërko produkte..." />
           <button type="submit">Kërko</button>
         </form>
 
-        <nav className="hdr__nav">
-          <Link to="/products">Produkte</Link>
-          <Link to="/track">Gjurmim</Link>
-          <Link to="/cart" className="hdr__cart">
-            Shporta
-            <span className="hdr__badge">{cartCount}</span>
-          </Link>
+        <nav className="nav">
+          <NavLink to="/products">Produkte</NavLink>
+          <NavLink to="/track">Gjurmim</NavLink>
+          <NavLink to="/cart">
+            Shporta <span className="badge">{count}</span>
+          </NavLink>
         </nav>
       </div>
     </header>

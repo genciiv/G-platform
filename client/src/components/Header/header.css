@@ -1,30 +1,31 @@
-.hdr {
-  position: sticky;
-  top: 0;
+.header {
+  border-bottom: 1px solid #e9e9e9;
   background: #fff;
-  border-bottom: 1px solid #eee;
-  z-index: 20;
 }
 
-.hdr__row {
+.header__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 0;
+  gap: 14px;
 }
 
-.hdr__logo {
+.logo {
   font-weight: 800;
+  text-decoration: none;
+  color: #111;
   font-size: 18px;
 }
 
-.hdr__search {
+.search {
   flex: 1;
   display: flex;
   gap: 8px;
 }
 
-.hdr__search input {
+.search input {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #ddd;
@@ -32,7 +33,7 @@
   outline: none;
 }
 
-.hdr__search button {
+.search button {
   padding: 10px 14px;
   border: 1px solid #111;
   background: #111;
@@ -41,29 +42,31 @@
   cursor: pointer;
 }
 
-.hdr__nav {
+.nav {
   display: flex;
+  gap: 12px;
   align-items: center;
-  gap: 14px;
 }
 
-.hdr__cart {
-  position: relative;
-  padding-right: 18px;
+.nav a {
+  text-decoration: none;
+  color: #2a2a2a;
 }
 
-.hdr__badge {
-  position: absolute;
-  top: -8px;
-  right: 0;
+.nav a.active {
+  font-weight: 700;
+}
+
+.badge {
+  display: inline-block;
   min-width: 18px;
   height: 18px;
-  padding: 0 6px;
+  line-height: 18px;
+  text-align: center;
+  font-size: 12px;
   border-radius: 999px;
+  margin-left: 6px;
   background: #111;
   color: #fff;
-  font-size: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  padding: 0 6px;
 }

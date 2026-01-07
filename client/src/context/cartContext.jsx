@@ -22,13 +22,6 @@ export const CartProvider = ({ children }) => {
     setItems((prev) => prev.filter((x) => x.product?._id !== productId));
   };
 
-  const setQty = (productId, qty) => {
-    const q = Math.max(1, Number(qty) || 1);
-    setItems((prev) =>
-      prev.map((x) => (x.product?._id === productId ? { ...x, qty: q } : x))
-    );
-  };
-
   const clearCart = () => setItems([]);
 
   const count = useMemo(
@@ -37,7 +30,7 @@ export const CartProvider = ({ children }) => {
   );
 
   const value = useMemo(
-    () => ({ items, count, addToCart, removeFromCart, setQty, clearCart }),
+    () => ({ items, count, addToCart, removeFromCart, clearCart }),
     [items, count]
   );
 

@@ -1,56 +1,74 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "../../../context/adminAuth.jsx";
-import "./adminLogin.css";
+import "./AdminLogin.css";
 
 export default function AdminLogin() {
+  const navigate = useNavigate();
   const { login } = useAdminAuth();
-  const nav = useNavigate();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [err, setErr] = useState("");
+  const [email, setEmail] = useState("admin@gapp.local");
+  const [password, setPassword] = useState("Admin12345!");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function submit(e) {
+  const onSubmit = async (e) => {
     e.preventDefault();
-    setErr("");
-    setLoading(true);
+    setError("");
+
+    if (!email.trim() || !password) {
+      setError("Email and password required");
+      return;
+    }
+
     try {
-      const u = await login(email, password);
-      if (u?.role !== "admin") throw new Error("Not admin");
-      nav("/admin/products");
-    } catch {
-      setErr("Login i pasaktë");
+      setLoading(true);
+      await login({ email: email.trim(), password });
+      navigate("/admin/products", { replace: true });
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message || err?.message || "Login failed";
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="al_wrap">
-      <div className="al_card">
-        <h2>Admin Login</h2>
+    <div className="adminLogin">
+      <div className="adminLogin__card">
+        <h1>Admin Login</h1>
+        <p>Hyr për të menaxhuar dyqanin.</p>
 
-        <form className="al_form" onSubmit={submit}>
-          <label>
-            Email
-            <input value={email} onChange={(e) => setEmail(e.target.value)} />
-          </label>
+        <form onSubmit={onSubmit}>
+          <label>Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="admin@gapp.local"
+            autoComplete="username"
+          />
 
-          <label>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
+          <label>Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="********"
+            autoComplete="current-password"
+          />
 
-          {err ? <p className="al_err">{err}</p> : null}
+          {error ? <div className="adminLogin__error">{error}</div> : null}
 
-          <button disabled={loading}>{loading ? "Duke hyrë..." : "Hyr"}</button>
+          <button type="submit" disabled={loading}>
+            {loading ? "Duke u futur..." : "Identifikohu"}
+          </button>
         </form>
+
+        <div className="adminLogin__hint">
+          Nëse s’ke admin: hap <code>/api/auth/seed-admin</code> një herë.
+        </div>
       </div>
     </div>
   );
