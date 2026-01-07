@@ -1,0 +1,9 @@
+.ad { display:grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 60px); }
+.ad__side { border-right:1px solid #eee; padding:14px; background:#fff; position:sticky; top:60px; height:calc(100vh - 60px); }
+.ad__brand { font-weight:800; margin-bottom:12px; }
+.ad__nav { display:grid; gap:8px; }
+.ad__nav a { padding:10px 10px; border-radius:10px; border:1px solid #eee; }
+.ad__nav a.active { border-color:#111; }
+.ad__logout { margin-top:12px; padding:10px 12px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; width:100%; }
+.ad__main { padding:16px; }
+@media (max-width: 900px) { .ad { grid-template-columns: 1fr; } .ad__side { position:static; height:auto; } }

@@ -1,0 +1,7 @@
+.al_wrap { display:flex; justify-content:center; padding:40px 12px; }
+.al_card { width:380px; border:1px solid #eee; border-radius:12px; padding:16px; background:#fff; }
+.al_form { display:grid; gap:10px; margin-top:10px; }
+label { display:grid; gap:6px; font-size:14px; }
+input { padding:10px 12px; border:1px solid #ddd; border-radius:10px; outline:none; }
+button { padding:10px 12px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer; }
+.al_err { color:#c00; margin:6px 0 0; }

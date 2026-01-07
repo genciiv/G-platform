@@ -1,9 +1,19 @@
 import { Router } from "express";
-import { addMovement, getStock } from "../controllers/inventoryController.js";
+import { requireAuth, requireAdmin } from "../middleware/auth.js";
+import {
+  createMovement,
+  getStockByWarehouse,
+} from "../controllers/inventoryController.js";
 
 const router = Router();
 
-router.post("/movements", addMovement);
-router.get("/stock", getStock);
+// admin
+router.get(
+  "/stock/:warehouseId",
+  requireAuth,
+  requireAdmin,
+  getStockByWarehouse
+);
+router.post("/movements", requireAuth, requireAdmin, createMovement);
 
 export default router;

@@ -19,15 +19,22 @@ export async function createOrder(req, res) {
 
     if (!warehouseId) return bad(res, "warehouseId is required");
     if (!customer?.fullName || !customer?.phone || !customer?.address) {
-      return bad(res, "customer.fullName, customer.phone, customer.address are required");
+      return bad(
+        res,
+        "customer.fullName, customer.phone, customer.address are required"
+      );
     }
-    if (!Array.isArray(items) || items.length === 0) return bad(res, "items is required");
+    if (!Array.isArray(items) || items.length === 0)
+      return bad(res, "items is required");
 
     const whId = new mongoose.Types.ObjectId(warehouseId);
 
     // Merr produktet nga DB (për çmim/sku snapshot + validim)
     const productIds = items.map((i) => i.productId);
-    const dbProducts = await Product.find({ _id: { $in: productIds }, isActive: true }).session(session);
+    const dbProducts = await Product.find({
+      _id: { $in: productIds },
+      isActive: true,
+    }).session(session);
 
     if (dbProducts.length !== items.length) {
       return bad(res, "Some products are missing or inactive");
@@ -39,9 +46,12 @@ export async function createOrder(req, res) {
 
     for (const it of items) {
       const qty = Number(it.quantity);
-      if (!it.productId || !qty || qty < 1) return bad(res, "Each item needs productId and quantity >= 1");
+      if (!it.productId || !qty || qty < 1)
+        return bad(res, "Each item needs productId and quantity >= 1");
 
-      const prod = dbProducts.find((p) => String(p._id) === String(it.productId));
+      const prod = dbProducts.find(
+        (p) => String(p._id) === String(it.productId)
+      );
       if (!prod) return bad(res, "Product not found in selection");
 
       // çmimi real që shet (nëse ka discountPrice)
@@ -55,7 +65,10 @@ export async function createOrder(req, res) {
       });
 
       if (stock < qty) {
-        return bad(res, `Not enough stock for ${prod.name} (available ${stock}, requested ${qty})`);
+        return bad(
+          res,
+          `Not enough stock for ${prod.name} (available ${stock}, requested ${qty})`
+        );
       }
 
       orderItems.push({
@@ -127,8 +140,10 @@ export async function cancelOrder(req, res) {
     const order = await Order.findById(id).session(session);
     if (!order) return bad(res, "Order not found", 404);
 
-    if (order.status === "CANCELLED") return bad(res, "Order already cancelled");
-    if (order.status === "DELIVERED") return bad(res, "Delivered orders cannot be cancelled");
+    if (order.status === "CANCELLED")
+      return bad(res, "Order already cancelled");
+    if (order.status === "DELIVERED")
+      return bad(res, "Delivered orders cannot be cancelled");
 
     // ndrysho status
     order.status = "CANCELLED";
@@ -162,7 +177,9 @@ export async function cancelOrder(req, res) {
 export async function trackOrder(req, res) {
   const { orderCode } = req.params;
 
-  const order = await Order.findOne({ orderCode: String(orderCode).toUpperCase() })
+  const order = await Order.findOne({
+    orderCode: String(orderCode).toUpperCase(),
+  })
     .select("orderCode status customer.fullName customer.city createdAt total")
     .lean();
 
@@ -173,10 +190,41 @@ export async function trackOrder(req, res) {
 
 // GET /api/orders (për admin më vonë) – tani e lëmë të hapur
 export async function listOrders(req, res) {
-  const rows = await Order.find()
-    .sort({ createdAt: -1 })
-    .limit(50)
-    .lean();
+  const rows = await Order.find().sort({ createdAt: -1 }).limit(50).lean();
 
   res.json(rows);
 }
+
+export const adminListOrders = async (req, res) => {
+  try {
+    const orders = await Order.find()
+      .sort({ createdAt: -1 })
+      .populate("warehouseId", "name")
+      .limit(200);
+
+    res.json(orders);
+  } catch {
+    res.status(500).json({ message: "Failed to fetch orders" });
+  }
+};
+
+export const adminUpdateStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const allowed = ["Pending", "Shipped", "Delivered", "Canceled"];
+    if (!allowed.includes(status))
+      return res.status(400).json({ message: "Invalid status" });
+
+    const updated = await Order.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true }
+    );
+
+    if (!updated) return res.status(404).json({ message: "Order not found" });
+
+    res.json(updated);
+  } catch {
+    res.status(500).json({ message: "Failed to update status" });
+  }
+};
