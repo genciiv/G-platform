@@ -1,23 +1,19 @@
+// server/src/routes/orderRoutes.js
 import { Router } from "express";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import {
   createOrder,
-  cancelOrder,
   trackOrder,
   listOrders,
-  adminListOrders,
-  adminUpdateStatus,
+  updateOrderStatus,
 } from "../controllers/orderController.js";
 
 const router = Router();
 
-// public/customer
-router.get("/track/:orderCode", trackOrder);
 router.post("/", createOrder);
-router.patch("/:id/cancel", cancelOrder);
+router.get("/track/:orderCode", trackOrder);
 
 // admin
-router.get("/", requireAuth, requireAdmin, adminListOrders);
-router.patch("/:id/status", requireAuth, requireAdmin, adminUpdateStatus);
+router.get("/", listOrders);
+router.patch("/:id/status", updateOrderStatus);
 
 export default router;

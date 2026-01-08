@@ -1,63 +1,109 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { api } from "../../services/api.js";
+import React, { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import "./trackOrder.css";
+import { http, getErrMsg } from "../../lib/api.js";
 
 export default function TrackOrder() {
-  const [sp] = useSearchParams();
-  const codeFromUrl = sp.get("code") || "";
+  const [searchParams] = useSearchParams();
+  const codeFromUrl = (searchParams.get("code") || "").trim();
 
   const [code, setCode] = useState(codeFromUrl);
-  const [data, setData] = useState(null);
+  const [order, setOrder] = useState(null);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  async function fetchIt(c) {
-    setErr("");
-    setData(null);
-    const cc = (c || "").trim();
-    if (!cc) return setErr("Vendos kodin e porosisë");
-
-    try {
-      const res = await api.get(`/api/orders/track/${encodeURIComponent(cc)}`);
-      setData(res.data);
-    } catch (e) {
-      setErr(e?.response?.data?.message || "Nuk u gjet porosia");
-    }
-  }
-
   useEffect(() => {
-    if (codeFromUrl) fetchIt(codeFromUrl);
+    if (codeFromUrl) {
+      // auto search
+      doTrack(codeFromUrl);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <div>
-      <h2>Gjurmim Porosie</h2>
+  async function doTrack(c) {
+    const val = (c || "").trim();
+    if (!val) return;
 
-      <div style={{ maxWidth: 520, marginTop: 12 }}>
-        <div style={{ display: "flex", gap: 8 }}>
+    setBusy(true);
+    setErr("");
+    setOrder(null);
+
+    try {
+      const res = await http.get(
+        `/api/orders/track/${encodeURIComponent(val)}`
+      );
+      setOrder(res.data?.order || null);
+    } catch (e) {
+      setErr(getErrMsg(e, "Porosia nuk u gjet"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="to-page">
+      <div className="to-head">
+        <h1>Gjurmim Porosie</h1>
+        <Link to="/" className="to-link">
+          ← Kryefaqja
+        </Link>
+      </div>
+
+      <div className="to-card">
+        <form
+          className="to-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            doTrack(code);
+          }}
+        >
           <input
-            style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd" }}
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="p.sh. GA-20260106-123456"
+            placeholder="Shkruaj kodin e porosisë (p.sh. G-2026...)"
           />
-          <button
-            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #111", background: "#111", color: "#fff" }}
-            onClick={() => fetchIt(code)}
-          >
-            Kërko
+          <button type="submit" disabled={busy}>
+            {busy ? "..." : "Kërko"}
           </button>
-        </div>
+        </form>
 
-        {err ? <p style={{ color: "#c00" }}>{err}</p> : null}
+        {err ? <div className="to-error">{err}</div> : null}
 
-        {data ? (
-          <div style={{ marginTop: 12, border: "1px solid #eee", borderRadius: 12, padding: 14 }}>
-            <div><b>Kodi:</b> {data.orderCode}</div>
-            <div><b>Status:</b> {data.status}</div>
-            <div><b>Emri:</b> {data.customer?.fullName}</div>
-            <div><b>Qyteti:</b> {data.customer?.city || "-"}</div>
-            <div><b>Totali:</b> {data.total}€</div>
+        {order ? (
+          <div className="to-order">
+            <div className="to-row">
+              <b>Kodi:</b> {order.orderCode}
+            </div>
+            <div className="to-row">
+              <b>Statusi:</b> {order.status}
+            </div>
+            <div className="to-row">
+              <b>Total:</b> {Number(order.total || 0).toFixed(2)} €
+            </div>
+            <div className="to-row">
+              <b>Emri:</b> {order.customerName}
+            </div>
+            <div className="to-row">
+              <b>Telefon:</b> {order.phone}
+            </div>
+            <div className="to-row">
+              <b>Adresë:</b> {order.address}
+            </div>
+
+            <div className="to-items">
+              <div className="to-items__title">Artikujt</div>
+              {order.items?.map((it, idx) => (
+                <div className="to-item" key={idx}>
+                  <div className="to-item__name">{it.title}</div>
+                  <div className="to-item__meta">
+                    {it.qty} × {Number(it.price || 0).toFixed(2)} €
+                  </div>
+                  <div className="to-item__sum">
+                    {(Number(it.price || 0) * Number(it.qty || 1)).toFixed(2)} €
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
       </div>

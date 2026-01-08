@@ -1,230 +1,118 @@
-import mongoose from "mongoose";
+// server/src/controllers/orderController.js
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
-import InventoryMovement from "../models/InventoryMovement.js";
-import { getStockForWarehouse } from "../utils/stock.js";
-import { makeOrderCode } from "../utils/orderCode.js";
 
-function bad(res, message, code = 400) {
-  return res.status(code).json({ message });
+function genOrderCode() {
+  // p.sh. G-20260108-482193
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const rand = Math.floor(100000 + Math.random() * 900000);
+  return `G-${y}${m}${day}-${rand}`;
 }
 
 // POST /api/orders
 export async function createOrder(req, res) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const { customerName, phone, address, note, items } = req.body || {};
 
-  try {
-    const { warehouseId, customer, items } = req.body;
-
-    if (!warehouseId) return bad(res, "warehouseId is required");
-    if (!customer?.fullName || !customer?.phone || !customer?.address) {
-      return bad(
-        res,
-        "customer.fullName, customer.phone, customer.address are required"
-      );
-    }
-    if (!Array.isArray(items) || items.length === 0)
-      return bad(res, "items is required");
-
-    const whId = new mongoose.Types.ObjectId(warehouseId);
-
-    // Merr produktet nga DB (për çmim/sku snapshot + validim)
-    const productIds = items.map((i) => i.productId);
-    const dbProducts = await Product.find({
-      _id: { $in: productIds },
-      isActive: true,
-    }).session(session);
-
-    if (dbProducts.length !== items.length) {
-      return bad(res, "Some products are missing or inactive");
-    }
-
-    // Ndërto order items + kontrollo stokun për secilin
-    const orderItems = [];
-    let total = 0;
-
-    for (const it of items) {
-      const qty = Number(it.quantity);
-      if (!it.productId || !qty || qty < 1)
-        return bad(res, "Each item needs productId and quantity >= 1");
-
-      const prod = dbProducts.find(
-        (p) => String(p._id) === String(it.productId)
-      );
-      if (!prod) return bad(res, "Product not found in selection");
-
-      // çmimi real që shet (nëse ka discountPrice)
-      const price = prod.discountPrice ?? prod.price;
-
-      // kontroll stok
-      const stock = await getStockForWarehouse({
-        warehouseId: whId,
-        productId: prod._id,
-        session,
-      });
-
-      if (stock < qty) {
-        return bad(
-          res,
-          `Not enough stock for ${prod.name} (available ${stock}, requested ${qty})`
-        );
-      }
-
-      orderItems.push({
-        productId: prod._id,
-        name: prod.name,
-        sku: prod.sku,
-        price,
-        quantity: qty,
-      });
-
-      total += price * qty;
-    }
-
-    const orderCode = makeOrderCode("GA");
-
-    // Krijo porosinë
-    const [order] = await Order.create(
-      [
-        {
-          orderCode,
-          warehouseId: whId,
-          customer: {
-            fullName: customer.fullName,
-            phone: customer.phone,
-            address: customer.address,
-            city: customer.city || "",
-          },
-          items: orderItems,
-          total,
-          paymentMethod: "COD",
-          status: "NEW",
-        },
-      ],
-      { session }
-    );
-
-    // Krijo OUT movements (dalje mall) të lidhura me porosinë
-    const moves = orderItems.map((oi) => ({
-      warehouseId: whId,
-      productId: oi.productId,
-      type: "OUT",
-      quantity: oi.quantity,
-      refType: "ORDER",
-      refId: order._id,
-      note: `Order ${order.orderCode}`,
-    }));
-
-    await InventoryMovement.insertMany(moves, { session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    return res.status(201).json(order);
-  } catch (e) {
-    await session.abortTransaction();
-    session.endSession();
-    return res.status(400).json({ message: e.message });
+  if (!customerName || !phone || !address) {
+    return res
+      .status(400)
+      .json({ message: "Name, phone and address are required" });
   }
-}
-
-// PATCH /api/orders/:id/cancel
-export async function cancelOrder(req, res) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    const { id } = req.params;
-
-    const order = await Order.findById(id).session(session);
-    if (!order) return bad(res, "Order not found", 404);
-
-    if (order.status === "CANCELLED")
-      return bad(res, "Order already cancelled");
-    if (order.status === "DELIVERED")
-      return bad(res, "Delivered orders cannot be cancelled");
-
-    // ndrysho status
-    order.status = "CANCELLED";
-    await order.save({ session });
-
-    // rikthe stokun (IN) për çdo item
-    const moves = order.items.map((oi) => ({
-      warehouseId: order.warehouseId,
-      productId: oi.productId,
-      type: "IN",
-      quantity: oi.quantity,
-      refType: "ORDER",
-      refId: order._id,
-      note: `Cancel ${order.orderCode}`,
-    }));
-
-    await InventoryMovement.insertMany(moves, { session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    return res.json({ ok: true, orderId: order._id, status: order.status });
-  } catch (e) {
-    await session.abortTransaction();
-    session.endSession();
-    return res.status(400).json({ message: e.message });
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ message: "Cart items are required" });
   }
+
+  // Normalize items
+  const normalized = items
+    .map((it) => ({
+      productId: it.productId || it._id || it.id,
+      qty: Number(it.qty || 1),
+    }))
+    .filter((x) => x.productId && x.qty > 0);
+
+  if (normalized.length === 0) {
+    return res.status(400).json({ message: "Invalid items" });
+  }
+
+  // Fetch products to validate + get title/price
+  const ids = normalized.map((x) => x.productId);
+  const prods = await Product.find({ _id: { $in: ids } });
+
+  const map = new Map(prods.map((p) => [String(p._id), p]));
+  const orderItems = normalized
+    .map((x) => {
+      const p = map.get(String(x.productId));
+      if (!p) return null;
+      return {
+        productId: p._id,
+        title: p.title,
+        price: Number(p.price || 0),
+        qty: x.qty,
+      };
+    })
+    .filter(Boolean);
+
+  if (orderItems.length === 0) {
+    return res.status(400).json({ message: "Products not found" });
+  }
+
+  const total = orderItems.reduce((sum, it) => sum + it.price * it.qty, 0);
+
+  // generate unique code (retry few times)
+  let orderCode = genOrderCode();
+  for (let i = 0; i < 5; i++) {
+    // eslint-disable-next-line no-await-in-loop
+    const exists = await Order.findOne({ orderCode });
+    if (!exists) break;
+    orderCode = genOrderCode();
+  }
+
+  const doc = await Order.create({
+    orderCode,
+    customerName: String(customerName).trim(),
+    phone: String(phone).trim(),
+    address: String(address).trim(),
+    note: note ? String(note).trim() : "",
+    items: orderItems,
+    total,
+    status: "Pending",
+  });
+
+  res.status(201).json({ orderCode: doc.orderCode, order: doc });
 }
 
 // GET /api/orders/track/:orderCode
 export async function trackOrder(req, res) {
   const { orderCode } = req.params;
-
-  const order = await Order.findOne({
-    orderCode: String(orderCode).toUpperCase(),
-  })
-    .select("orderCode status customer.fullName customer.city createdAt total")
-    .lean();
-
-  if (!order) return res.status(404).json({ message: "Order not found" });
-
-  res.json(order);
+  const doc = await Order.findOne({ orderCode: String(orderCode).trim() });
+  if (!doc) return res.status(404).json({ message: "Order not found" });
+  res.json({ order: doc });
 }
 
-// GET /api/orders (për admin më vonë) – tani e lëmë të hapur
+// GET /api/orders (admin list)
 export async function listOrders(req, res) {
-  const rows = await Order.find().sort({ createdAt: -1 }).limit(50).lean();
-
-  res.json(rows);
+  const docs = await Order.find().sort({ createdAt: -1 });
+  res.json({ items: docs });
 }
 
-export const adminListOrders = async (req, res) => {
-  try {
-    const orders = await Order.find()
-      .sort({ createdAt: -1 })
-      .populate("warehouseId", "name")
-      .limit(200);
+// PATCH /api/orders/:id/status
+export async function updateOrderStatus(req, res) {
+  const { id } = req.params;
+  const { status } = req.body || {};
 
-    res.json(orders);
-  } catch {
-    res.status(500).json({ message: "Failed to fetch orders" });
+  const allowed = ["Pending", "Shipped", "Delivered", "Cancelled"];
+  if (!allowed.includes(status)) {
+    return res.status(400).json({ message: "Invalid status" });
   }
-};
 
-export const adminUpdateStatus = async (req, res) => {
-  try {
-    const { status } = req.body;
-    const allowed = ["Pending", "Shipped", "Delivered", "Canceled"];
-    if (!allowed.includes(status))
-      return res.status(400).json({ message: "Invalid status" });
+  const doc = await Order.findById(id);
+  if (!doc) return res.status(404).json({ message: "Order not found" });
 
-    const updated = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
+  doc.status = status;
+  await doc.save();
 
-    if (!updated) return res.status(404).json({ message: "Order not found" });
-
-    res.json(updated);
-  } catch {
-    res.status(500).json({ message: "Failed to update status" });
-  }
-};
+  res.json({ order: doc });
+}

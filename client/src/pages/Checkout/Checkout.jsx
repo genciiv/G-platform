@@ -1,157 +1,141 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useCart } from "../../context/cartContext.jsx";
-import { api } from "../../services/api.js";
+import React, { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "./checkout.css";
+import { useCart } from "../../context/cartContext.jsx";
+import { http, getErrMsg } from "../../lib/api.js";
 
 export default function Checkout() {
-  const { items, cartTotal, clearCart } = useCart();
-  const nav = useNavigate();
+  const navigate = useNavigate();
+  const { items, clearCart } = useCart();
 
-  const [warehouses, setWarehouses] = useState([]);
-  const [warehouseId, setWarehouseId] = useState("");
-
-  const [fullName, setFullName] = useState("");
+  const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [city, setCity] = useState("Fier");
+  const [note, setNote] = useState("");
 
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  const canSubmit = useMemo(() => {
-    return (
-      items.length > 0 &&
-      warehouseId &&
-      fullName.trim() &&
-      phone.trim() &&
-      address.trim()
-    );
-  }, [items.length, warehouseId, fullName, phone, address]);
-
-  useEffect(() => {
-    let alive = true;
-
-    api
-      .get("/api/warehouses")
-      .then((res) => {
-        if (!alive) return;
-        const list = res.data || [];
-        setWarehouses(list);
-
-        // default: first warehouse
-        if (list.length > 0) setWarehouseId(list[0]._id);
-      })
-      .catch(() => {
-        if (!alive) return;
-        setWarehouses([]);
-        setErr("Nuk u arrit të merret lista e magazinave.");
-      });
-
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const total = useMemo(
+    () =>
+      items.reduce(
+        (sum, it) => sum + Number(it.price || 0) * (Number(it.qty) || 1),
+        0
+      ),
+    [items]
+  );
 
   async function submit(e) {
     e.preventDefault();
     setErr("");
 
     if (items.length === 0) return setErr("Shporta është bosh.");
-    if (!warehouseId) return setErr("Nuk ka magazinë aktive.");
-    if (!fullName.trim() || !phone.trim() || !address.trim()) {
-      return setErr("Plotëso emrin, telefonin dhe adresën.");
-    }
+    if (!customerName.trim()) return setErr("Emri është i detyrueshëm.");
+    if (!phone.trim()) return setErr("Telefoni është i detyrueshëm.");
+    if (!address.trim()) return setErr("Adresa është e detyrueshme.");
 
-    setLoading(true);
+    setBusy(true);
     try {
       const payload = {
-        warehouseId,
-        customer: { fullName, phone, address, city },
-        items: items.map((it) => ({ productId: it._id, quantity: it.quantity })),
+        customerName: customerName.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        note: note.trim(),
+        items: items.map((it) => ({
+          productId: it._id || it.id,
+          qty: Number(it.qty || 1),
+        })),
       };
 
-      const res = await api.post("/api/orders", payload);
+      const res = await http.post("/api/orders", payload);
+      const code = res.data?.orderCode;
 
       clearCart();
-      nav(`/track?code=${encodeURIComponent(res.data.orderCode)}`);
+
+      if (code) navigate(`/track?code=${encodeURIComponent(code)}`);
+      else navigate("/track");
     } catch (e2) {
-      setErr(e2?.response?.data?.message || "Gabim gjatë porosisë");
+      setErr(getErrMsg(e2, "Nuk u krijua porosia"));
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   }
 
   return (
-    <div>
-      <h2>Checkout</h2>
+    <div className="co-page">
+      <div className="co-head">
+        <h1>Checkout</h1>
+        <Link to="/cart" className="co-link">
+          ← Kthehu te shporta
+        </Link>
+      </div>
 
-      <div className="box">
-        <div className="sum">
-          <div>
-            Totali: <b>{cartTotal.toFixed(2)}€</b>
-          </div>
-          <div className="muted">
-            Pagesa: <b>Cash on Delivery</b>
-          </div>
-        </div>
+      {err ? <div className="co-error">{err}</div> : null}
 
-        {warehouses.length === 0 ? (
-          <p className="muted">
-            Nuk ka magazina. Krijo një magazinë në DB që checkout të funksionojë.
-          </p>
-        ) : null}
+      <div className="co-grid">
+        <form className="co-card" onSubmit={submit}>
+          <h2>Të dhënat</h2>
 
-        {warehouses.length > 1 ? (
-          <div style={{ marginBottom: 10 }}>
-            <label style={{ display: "grid", gap: 6, fontSize: 14 }}>
-              Magazina
-              <select
-                value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
-                style={{
-                  padding: "10px 12px",
-                  border: "1px solid #ddd",
-                  borderRadius: 10,
-                }}
-              >
-                {warehouses.map((w) => (
-                  <option key={w._id} value={w._id}>
-                    {w.name || w._id}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        ) : null}
+          <label>Emri dhe Mbiemri</label>
+          <input
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+          />
 
-        <form className="form" onSubmit={submit}>
-          <label>
-            Emri & Mbiemri
-            <input value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          </label>
+          <label>Telefon</label>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} />
 
-          <label>
-            Telefon
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} />
-          </label>
+          <label>Adresë</label>
+          <input value={address} onChange={(e) => setAddress(e.target.value)} />
 
-          <label>
-            Adresa
-            <input value={address} onChange={(e) => setAddress(e.target.value)} />
-          </label>
+          <label>Shënim (opsionale)</label>
+          <textarea
+            rows={4}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
 
-          <label>
-            Qyteti
-            <input value={city} onChange={(e) => setCity(e.target.value)} />
-          </label>
-
-          {err ? <p className="err">{err}</p> : null}
-
-          <button className="btn" disabled={loading || !canSubmit}>
-            {loading ? "Duke dërguar..." : "Kryeje Porosinë"}
+          <button
+            className="co-btn co-btn--primary"
+            disabled={busy}
+            type="submit"
+          >
+            {busy ? "Duke krijuar..." : "Krijo Porosinë"}
           </button>
         </form>
+
+        <div className="co-card">
+          <h2>Porosia</h2>
+
+          {items.length === 0 ? (
+            <div style={{ color: "#6b7280" }}>Shporta është bosh.</div>
+          ) : (
+            <div className="co-lines">
+              {items.map((it) => {
+                const id = it._id || it.id;
+                const title = it.title || it.name || "Produkt";
+                const qty = Number(it.qty || 1);
+                const price = Number(it.price || 0);
+                return (
+                  <div className="co-line" key={id}>
+                    <div className="co-line__title">{title}</div>
+                    <div className="co-line__meta">
+                      {qty} × {price.toFixed(2)} €
+                    </div>
+                    <div className="co-line__sum">
+                      {(qty * price).toFixed(2)} €
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="co-total">
+            <div>Total</div>
+            <div className="co-total__num">{total.toFixed(2)} €</div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,60 +1,107 @@
+import React, { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useCart } from "../../context/cartContext.jsx";
 import "./cart.css";
+import { useCart } from "../../context/cartContext.jsx";
 
 export default function Cart() {
-  const { items, cartTotal, removeFromCart, setQty } = useCart();
-  const nav = useNavigate();
+  const navigate = useNavigate();
+  const { items, removeFromCart, clearCart, setItems } = useCart();
 
-  if (items.length === 0) {
-    return (
-      <div>
-        <h2>Shporta</h2>
-        <p>Shporta është bosh.</p>
-        <Link to="/products">Shko te produktet</Link>
-      </div>
+  const total = useMemo(
+    () =>
+      items.reduce(
+        (sum, it) => sum + Number(it.price || 0) * (Number(it.qty) || 1),
+        0
+      ),
+    [items]
+  );
+
+  const updateQty = (id, qty) => {
+    setItems((prev) =>
+      prev.map((x) =>
+        (x._id || x.id) === id
+          ? { ...x, qty: Math.max(1, Number(qty || 1)) }
+          : x
+      )
     );
-  }
+  };
 
   return (
-    <div>
-      <h2>Shporta</h2>
+    <div className="cart-page">
+      <div className="cart-head">
+        <h1>Shporta</h1>
+        <Link to="/products" className="cart-link">
+          ← Vazhdoni blerjet
+        </Link>
+      </div>
 
-      <div className="cart">
-        <div className="cart__list">
-          {items.map((it) => (
-            <div className="row" key={it._id}>
-              <div className="row__left">
-                <div className="name">{it.name}</div>
-                <div className="price">{it.price}€</div>
-              </div>
-
-              <div className="row__right">
-                <input
-                  type="number"
-                  min="1"
-                  value={it.quantity}
-                  onChange={(e) => setQty(it._id, e.target.value)}
-                />
-                <button className="link" onClick={() => removeFromCart(it._id)}>
-                  Hiq
-                </button>
-              </div>
-            </div>
-          ))}
+      {items.length === 0 ? (
+        <div className="cart-empty">
+          Shporta është bosh.
+          <div style={{ marginTop: 10 }}>
+            <Link to="/products" className="cart-btn cart-btn--primary">
+              Shko te produktet
+            </Link>
+          </div>
         </div>
+      ) : (
+        <>
+          <div className="cart-card">
+            {items.map((it) => {
+              const id = it._id || it.id;
+              const title = it.title || it.name || "Produkt";
+              const price = Number(it.price || 0);
+              const qty = Number(it.qty || 1);
 
-        <div className="cart__sum">
-          <div className="sumrow">
-            <span>Totali</span>
-            <b>{cartTotal.toFixed(2)}€</b>
+              return (
+                <div className="cart-row" key={id}>
+                  <div className="cart-row__left">
+                    <div className="cart-title">{title}</div>
+                    <div className="cart-sub">{price.toFixed(2)} € / copë</div>
+                  </div>
+
+                  <div className="cart-row__right">
+                    <input
+                      className="cart-qty"
+                      type="number"
+                      min="1"
+                      value={qty}
+                      onChange={(e) => updateQty(id, e.target.value)}
+                    />
+                    <div className="cart-line">
+                      {(price * qty).toFixed(2)} €
+                    </div>
+                    <button
+                      className="cart-btn cart-btn--danger"
+                      onClick={() => removeFromCart(id)}
+                    >
+                      Hiq
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          <button className="btn" onClick={() => nav("/checkout")}>
-            Vazhdo te Checkout
-          </button>
-        </div>
-      </div>
+          <div className="cart-footer">
+            <button className="cart-btn" onClick={clearCart}>
+              Pastro shportën
+            </button>
+
+            <div className="cart-total">
+              <div>Total</div>
+              <div className="cart-total__num">{total.toFixed(2)} €</div>
+            </div>
+
+            <button
+              className="cart-btn cart-btn--primary"
+              onClick={() => navigate("/checkout")}
+            >
+              Vazhdo te pagesa →
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
