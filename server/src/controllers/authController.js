@@ -8,11 +8,12 @@ function setTokenCookie(res, payload) {
   res.cookie("token", token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: false, // kur ta hedhësh live me https -> true
+    secure: false, // prod me https -> true
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 }
 
+// ✅ SEED / RESET ADMIN: krijon ose e përditëson password-in nëse ekziston
 export async function adminSeed(req, res) {
   try {
     const name = process.env.ADMIN_NAME || "Admin";
@@ -20,28 +21,22 @@ export async function adminSeed(req, res) {
     const password = process.env.ADMIN_PASSWORD || "";
 
     if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "ADMIN_EMAIL/ADMIN_PASSWORD missing in .env" });
-    }
-
-    const exists = await User.findOne({ email });
-    if (exists) {
-      return res
-        .status(200)
-        .json({ ok: true, message: "Admin already exists", email });
+      return res.status(400).json({ message: "ADMIN_EMAIL/ADMIN_PASSWORD missing in .env" });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    await User.create({
-      name,
-      email,
-      passwordHash,
-      role: "admin",
-    });
+    const admin = await User.findOneAndUpdate(
+      { email },
+      { name, email, passwordHash, role: "admin" },
+      { new: true, upsert: true }
+    );
 
-    return res.status(201).json({ ok: true, message: "Admin created", email });
+    return res.json({
+      ok: true,
+      message: "Admin is ready (created/updated)",
+      email: admin.email,
+    });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -71,12 +66,7 @@ export async function login(req, res) {
 
     return res.json({
       ok: true,
-      admin: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      },
+      admin: { id: user._id, email: user.email, name: user.name, role: user.role },
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
