@@ -1,78 +1,91 @@
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { api } from "../../services/api.js";
+import React, { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import "./productDetails.css";
+import { http, getErrMsg } from "../../lib/api.js";
 import { useCart } from "../../context/cartContext.jsx";
 
 export default function ProductDetails() {
   const { id } = useParams();
   const { addToCart } = useCart();
 
-  const [product, setProduct] = useState(null);
+  const [item, setItem] = useState(null);
+  const [qty, setQty] = useState(1);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  useEffect(() => {
-    let alive = true;
+  async function load() {
+    setErr("");
     setLoading(true);
+    try {
+      const res = await http.get(`/api/products/${id}`);
+      setItem(res.data?.item || res.data?.product || res.data || null);
+    } catch (e) {
+      setErr(getErrMsg(e, "S’u gjet produkti"));
+    } finally {
+      setLoading(false);
+    }
+  }
 
-    api
-      .get("/api/products")
-      .then((res) => {
-        if (!alive) return;
-        const found = (res.data || []).find((p) => p._id === id);
-        if (!found) {
-          setErr("Produkti nuk u gjet");
-          setProduct(null);
-        } else {
-          setProduct(found);
-        }
-      })
-      .catch(() => setErr("Gabim gjatë ngarkimit"))
-      .finally(() => alive && setLoading(false));
-
-    return () => {
-      alive = false;
-    };
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  if (loading) return <p>Po ngarkohet...</p>;
-  if (err) return <p style={{ color: "red" }}>{err}</p>;
-  if (!product) return null;
+  if (loading) return <div style={{ padding: 24 }}>Duke ngarkuar...</div>;
+  if (err) return <div style={{ padding: 24, color: "#991b1b" }}>{err}</div>;
+  if (!item) return <div style={{ padding: 24 }}>Produkt i panjohur.</div>;
+
+  const title = item.title || item.name || "Produkt";
+  const price = Number(item.price || 0).toFixed(2);
+  const img = item.image || item.imageUrl || "";
 
   return (
-    <div style={{ maxWidth: 600 }}>
-      <h2>{product.name}</h2>
-
-      <div style={{ margin: "12px 0", fontSize: 18 }}>
-        {product.discountPrice ? (
-          <>
-            <span style={{ textDecoration: "line-through", color: "#777", marginRight: 10 }}>
-              {product.price}€
-            </span>
-            <b>{product.discountPrice}€</b>
-          </>
-        ) : (
-          <b>{product.price}€</b>
-        )}
+    <div className="pd-wrap">
+      <div className="pd-top">
+        <Link to="/products" className="pd-back">
+          ← Produktet
+        </Link>
       </div>
 
-      {product.description ? (
-        <p style={{ marginBottom: 14 }}>{product.description}</p>
-      ) : null}
+      <div className="pd-card">
+        <div className="pd-img">
+          {img ? (
+            <img src={img} alt={title} />
+          ) : (
+            <div className="pd-ph">No Image</div>
+          )}
+        </div>
 
-      <button
-        style={{
-          padding: "10px 14px",
-          borderRadius: 10,
-          border: "1px solid #111",
-          background: "#111",
-          color: "#fff",
-          cursor: "pointer",
-        }}
-        onClick={() => addToCart(product, 1)}
-      >
-        Shto në shportë
-      </button>
+        <div className="pd-body">
+          <h1>{title}</h1>
+          <div className="pd-price">{price} €</div>
+          {item.description ? (
+            <p className="pd-desc">{item.description}</p>
+          ) : null}
+
+          <div className="pd-actions">
+            <label className="pd-qty">
+              Sasia
+              <input
+                type="number"
+                min="1"
+                value={qty}
+                onChange={(e) =>
+                  setQty(Math.max(1, Number(e.target.value || 1)))
+                }
+              />
+            </label>
+
+            <button
+              className="pd-add"
+              onClick={() => addToCart(item, qty)}
+              type="button"
+            >
+              Shto në shportë
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

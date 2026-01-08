@@ -1,0 +1,107 @@
+.pd-wrap {
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 22px 0 60px;
+}
+
+.pd-top {
+  margin-bottom: 12px;
+}
+
+.pd-back {
+  text-decoration: none;
+  color: #111;
+  border: 1px solid #e5e7eb;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fff;
+  font-weight: 800;
+}
+
+.pd-card {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #eef2f7;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .pd-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pd-img {
+  background: #f8fafc;
+  min-height: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pd-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pd-ph {
+  color: #94a3b8;
+  font-weight: 900;
+}
+
+.pd-body {
+  padding: 16px;
+}
+
+.pd-body h1 {
+  margin: 0 0 8px;
+  font-size: 26px;
+}
+
+.pd-price {
+  font-size: 22px;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+
+.pd-desc {
+  color: #4b5563;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.pd-actions {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.pd-qty {
+  display: grid;
+  gap: 6px;
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.pd-qty input {
+  width: 120px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.pd-add {
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid #0f172a;
+  background: #0f172a;
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+}
