@@ -1,10 +1,16 @@
+// client/src/lib/api.js
 import axios from "axios";
 
-export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
-  withCredentials: true, // needed for httpOnly cookie auth
+export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+export const http = axios.create({
+  baseURL: API_BASE,
+  withCredentials: true, // cookie auth
 });
 
-export const getErrorMessage = (err) => {
-  return err?.response?.data?.message || err?.message || "Something went wrong";
-};
+// helpers
+export const getErrMsg = (err, fallback = "Gabim") =>
+  err?.response?.data?.message ||
+  err?.response?.data?.error ||
+  err?.message ||
+  fallback;

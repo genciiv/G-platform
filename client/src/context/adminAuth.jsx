@@ -1,15 +1,14 @@
 // client/src/context/adminAuth.jsx
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { http } from "../lib/api.js";
 
 const AdminAuthContext = createContext(null);
-
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-const http = axios.create({
-  baseURL: API,
-  withCredentials: true, // nese serveri perdor cookie
-});
 
 export function AdminAuthProvider({ children }) {
   const [admin, setAdmin] = useState(null);
@@ -29,15 +28,17 @@ export function AdminAuthProvider({ children }) {
 
   useEffect(() => {
     refreshMe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const login = async ({ email, password }) => {
+  // pranon: login({email,password}) OSE login(email,password)
+  const login = async (a, b) => {
+    const email = typeof a === "object" ? a.email : a;
+    const password = typeof a === "object" ? a.password : b;
+
     const res = await http.post("/api/auth/login", { email, password });
-    const user = res.data?.user || res.data?.admin || res.data || null;
+    const user = res.data?.user || res.data?.admin || null;
     setAdmin(user);
 
-    // sinkronizo statusin (sidomos nese auth eshte me cookie)
     await refreshMe();
     return res.data;
   };
@@ -60,16 +61,20 @@ export function AdminAuthProvider({ children }) {
       login,
       logout,
       refreshMe,
-      apiBase: API,
     }),
     [admin, loading]
   );
 
-  return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;
+  return (
+    <AdminAuthContext.Provider value={value}>
+      {children}
+    </AdminAuthContext.Provider>
+  );
 }
 
 export function useAdminAuth() {
   const ctx = useContext(AdminAuthContext);
-  if (!ctx) throw new Error("useAdminAuth must be used within AdminAuthProvider");
+  if (!ctx)
+    throw new Error("useAdminAuth must be used within AdminAuthProvider");
   return ctx;
 }

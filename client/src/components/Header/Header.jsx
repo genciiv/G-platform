@@ -1,3 +1,4 @@
+// client/src/components/Header/Header.jsx
 import React, { useMemo, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 
@@ -10,32 +11,23 @@ export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { items, count } = useCart();
-  const { isAdmin, logout } = useAdminAuth();
+  const { items } = useCart();
+  const { isAdmin } = useAdminAuth();
 
   const [q, setQ] = useState("");
 
-  const isAdminRoute = useMemo(
-    () => location.pathname.startsWith("/admin"),
-    [location.pathname]
-  );
+  const inAdmin = location.pathname.startsWith("/admin");
 
   const cartCount = useMemo(() => {
-    if (typeof count === "number") return count;
     if (!items || !Array.isArray(items)) return 0;
     return items.reduce((sum, it) => sum + (Number(it.qty) || 1), 0);
-  }, [items, count]);
+  }, [items]);
 
   function onSearch(e) {
     e.preventDefault();
     const query = q.trim();
     if (!query) return navigate("/products");
     navigate(`/products?q=${encodeURIComponent(query)}`);
-  }
-
-  async function handleLogout() {
-    await logout();
-    navigate("/");
   }
 
   return (
@@ -58,15 +50,30 @@ export default function Header() {
         </form>
 
         <nav className="nav">
-          <NavLink to="/products" className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}>
+          <NavLink
+            to="/products"
+            className={({ isActive }) =>
+              isActive ? "nav-link active" : "nav-link"
+            }
+          >
             Produkte
           </NavLink>
 
-          <NavLink to="/track" className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}>
+          <NavLink
+            to="/track"
+            className={({ isActive }) =>
+              isActive ? "nav-link active" : "nav-link"
+            }
+          >
             Gjurmim
           </NavLink>
 
-          <NavLink to="/cart" className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}>
+          <NavLink
+            to="/cart"
+            className={({ isActive }) =>
+              isActive ? "nav-link active" : "nav-link"
+            }
+          >
             Shporta <span className="badge">{cartCount}</span>
           </NavLink>
 
@@ -75,18 +82,10 @@ export default function Header() {
               Identifikohu
             </NavLink>
           ) : (
-            <>
-              <NavLink to="/admin/products" className="nav-link admin-btn">
-                Admin
-              </NavLink>
-
-              {/* ✅ Dil ne top NUK del kur je brenda /admin */}
-              {!isAdminRoute ? (
-                <button className="nav-link logout-btn" onClick={handleLogout} type="button">
-                  Dil
-                </button>
-              ) : null}
-            </>
+            // kur je admin: shfaq vetëm "Admin" (pa "Dil" në header)
+            <NavLink to="/admin/products" className="nav-link admin-btn">
+              Admin
+            </NavLink>
           )}
         </nav>
       </div>
