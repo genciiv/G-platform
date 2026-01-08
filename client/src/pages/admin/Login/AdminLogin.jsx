@@ -1,3 +1,4 @@
+// client/src/pages/admin/Login/AdminLogin.jsx
 import React, { useState } from "react";
 import "./adminLogin.css";
 import { useAdminAuth } from "../../../context/adminAuth.jsx";
@@ -10,15 +11,21 @@ export default function AdminLogin() {
   const [email, setEmail] = useState("admin@gapp.local");
   const [password, setPassword] = useState("Admin12345!");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
+    setLoading(true);
+
     try {
-      await login({ email, password }); // ✅ FIX
-      navigate("/admin/products");      // ✅ shko te admin
+      // ✅ KJO eshte e sakta (objekt)
+      await login({ email: email.trim(), password });
+      navigate("/admin/products");
     } catch (err) {
       setError(err?.response?.data?.message || "Invalid credentials");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -30,22 +37,29 @@ export default function AdminLogin() {
 
         <form onSubmit={onSubmit}>
           <label>Email</label>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
+          />
 
           <label>Password</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
           />
 
           {error ? <div className="admin-login-error">{error}</div> : null}
 
-          <button type="submit">Identifikohu</button>
+          <button type="submit" disabled={loading}>
+            {loading ? "Duke u futur..." : "Identifikohu"}
+          </button>
         </form>
 
         <div className="admin-login-hint">
-          Nëse s’ke admin: hap <b>/api/auth/seed-admin</b> (vetëm lokal)
+          Nëse s’ke admin: hap <b>http://localhost:5000/api/auth/seed-admin</b> (vetëm lokal)
         </div>
       </div>
     </div>

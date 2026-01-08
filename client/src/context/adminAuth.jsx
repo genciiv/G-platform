@@ -1,3 +1,4 @@
+// client/src/context/adminAuth.jsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
@@ -5,18 +6,9 @@ const AdminAuthContext = createContext(null);
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-function getToken() {
-  return localStorage.getItem("admin_token") || "";
-}
-
 const http = axios.create({
   baseURL: API,
-});
-
-http.interceptors.request.use((config) => {
-  const token = getToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+  withCredentials: true, // nese serveri perdor cookie
 });
 
 export function AdminAuthProvider({ children }) {
@@ -42,20 +34,10 @@ export function AdminAuthProvider({ children }) {
 
   const login = async ({ email, password }) => {
     const res = await http.post("/api/auth/login", { email, password });
+    const user = res.data?.user || res.data?.admin || res.data || null;
+    setAdmin(user);
 
-    // prano token me emra te ndryshem
-    const token =
-      res.data?.token ||
-      res.data?.accessToken ||
-      res.data?.jwt ||
-      res.data?.data?.token ||
-      "";
-
-    if (token) localStorage.setItem("admin_token", token);
-
-    const user = res.data?.user || res.data?.admin || null;
-    if (user) setAdmin(user);
-
+    // sinkronizo statusin (sidomos nese auth eshte me cookie)
     await refreshMe();
     return res.data;
   };
@@ -66,7 +48,6 @@ export function AdminAuthProvider({ children }) {
     } catch {
       // ignore
     } finally {
-      localStorage.removeItem("admin_token");
       setAdmin(null);
     }
   };
