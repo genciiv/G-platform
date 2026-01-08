@@ -1,94 +1,77 @@
+// server/src/controllers/productController.js
 import Product from "../models/Product.js";
 
-/**
- * GET /api/products
- * Public: list products
- */
-export const listProducts = async (req, res) => {
-  try {
-    const products = await Product.find().sort({ createdAt: -1 });
-    res.json(products);
-  } catch (err) {
-    console.error("listProducts:", err.message);
-    res.status(500).json({ message: "Failed to fetch products" });
+// GET /api/products?q=...
+export async function listProducts(req, res) {
+  const q = (req.query.q || "").trim();
+
+  const filter = q
+    ? {
+        $or: [
+          { title: { $regex: q, $options: "i" } },
+          { sku: { $regex: q, $options: "i" } },
+        ],
+      }
+    : {};
+
+  const items = await Product.find(filter).sort({ createdAt: -1 });
+  res.json({ items });
+}
+
+// GET /api/products/:id
+export async function getProductById(req, res) {
+  const { id } = req.params;
+  const item = await Product.findById(id);
+  if (!item) return res.status(404).json({ message: "Product not found" });
+  res.json({ item });
+}
+
+// POST /api/products
+export async function createProduct(req, res) {
+  const { title, price, sku, description, image, active } = req.body || {};
+
+  if (!title || String(title).trim() === "") {
+    return res.status(400).json({ message: "Title is required" });
   }
-};
 
-/**
- * GET /api/products/:id
- * Public: single product
- */
-export const getProduct = async (req, res) => {
-  try {
-    const p = await Product.findById(req.params.id);
-    if (!p) return res.status(404).json({ message: "Product not found" });
-    res.json(p);
-  } catch (err) {
-    console.error("getProduct:", err.message);
-    res.status(500).json({ message: "Failed to fetch product" });
-  }
-};
+  const doc = await Product.create({
+    title: String(title).trim(),
+    price: Number(price || 0),
+    sku: sku ? String(sku).trim() : "",
+    description: description ? String(description).trim() : "",
+    image: image ? String(image).trim() : "",
+    active: active !== undefined ? !!active : true,
+  });
 
-/**
- * POST /api/products
- * Admin: create product
- */
-export const createProduct = async (req, res) => {
-  try {
-    const { name, price, discountPrice, description, sku, images } = req.body;
+  res.status(201).json({ item: doc });
+}
 
-    if (!name || price === undefined) {
-      return res.status(400).json({ message: "name and price are required" });
-    }
+// PUT /api/products/:id
+export async function updateProduct(req, res) {
+  const { id } = req.params;
+  const { title, price, sku, description, image, active } = req.body || {};
 
-    const p = await Product.create({
-      name: String(name).trim(),
-      price: Number(price),
-      discountPrice:
-        discountPrice === undefined || discountPrice === ""
-          ? undefined
-          : Number(discountPrice),
-      description: description || "",
-      sku: sku || "",
-      images: Array.isArray(images) ? images : [],
-    });
+  const item = await Product.findById(id);
+  if (!item) return res.status(404).json({ message: "Product not found" });
 
-    res.status(201).json(p);
-  } catch (err) {
-    console.error("createProduct:", err.message);
-    res.status(500).json({ message: "Failed to create product" });
-  }
-};
+  if (title !== undefined) item.title = String(title).trim();
+  if (price !== undefined) item.price = Number(price || 0);
+  if (sku !== undefined) item.sku = sku ? String(sku).trim() : "";
+  if (description !== undefined)
+    item.description = description ? String(description).trim() : "";
+  if (image !== undefined) item.image = image ? String(image).trim() : "";
+  if (active !== undefined) item.active = !!active;
 
-/**
- * PATCH /api/products/:id
- * Admin: update product
- */
-export const updateProduct = async (req, res) => {
-  try {
-    const updated = await Product.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
+  await item.save();
+  res.json({ item });
+}
 
-    if (!updated) return res.status(404).json({ message: "Product not found" });
-    res.json(updated);
-  } catch (err) {
-    console.error("updateProduct:", err.message);
-    res.status(500).json({ message: "Failed to update product" });
-  }
-};
+// DELETE /api/products/:id
+export async function deleteProduct(req, res) {
+  const { id } = req.params;
 
-/**
- * DELETE /api/products/:id
- * Admin: delete product
- */
-export const deleteProduct = async (req, res) => {
-  try {
-    const deleted = await Product.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: "Product not found" });
-    res.json({ message: "Product deleted" });
-  } catch (err) {
-    console.error("deleteProduct:", err.message);
-    res.status(500).json({ message: "Failed to delete product" });
-  }
-};
+  const deleted = await Product.findByIdAndDelete(id);
+  if (!deleted) return res.status(404).json({ message: "Product not found" });
+
+  res.json({ ok: true });
+}

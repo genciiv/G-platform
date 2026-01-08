@@ -1,8 +1,8 @@
+// server/src/routes/productRoutes.js
 import { Router } from "express";
-import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import {
   listProducts,
-  getProduct,
+  getProductById,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -10,13 +10,10 @@ import {
 
 const router = Router();
 
-// public
 router.get("/", listProducts);
-router.get("/:id", getProduct);
-
-// admin
-router.post("/", requireAuth, requireAdmin, createProduct);
-router.patch("/:id", requireAuth, requireAdmin, updateProduct);
-router.delete("/:id", requireAuth, requireAdmin, deleteProduct);
+router.get("/:id", getProductById);
+router.post("/", createProduct);
+router.put("/:id", updateProduct);
+router.delete("/:id", deleteProduct);
 
 export default router;
