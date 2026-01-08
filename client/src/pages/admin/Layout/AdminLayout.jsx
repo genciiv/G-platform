@@ -1,47 +1,81 @@
-import { Outlet, Link, useNavigate } from "react-router-dom";
+// client/src/pages/Admin/Layout/AdminLayout.jsx
+import React from "react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import "./adminLayout.css";
 import { useAdminAuth } from "../../../context/adminAuth.jsx";
 
 export default function AdminLayout() {
-  const nav = useNavigate();
-  const { user, logout } = useAdminAuth();
+  const { logout } = useAdminAuth();
+  const navigate = useNavigate();
 
   const onLogout = async () => {
-    await logout();
-    nav("/admin/login");
+    try {
+      await logout();
+    } finally {
+      navigate("/admin/login");
+    }
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside style={{ width: 260, borderRight: "1px solid #eee", padding: 16 }}>
-        <h3 style={{ marginTop: 0 }}>Admin Panel</h3>
-        <div style={{ fontSize: 13, color: "#666", marginBottom: 12 }}>
-          {user?.email} ({user?.role})
+    <div className="admin-shell">
+      <aside className="admin-sidebar">
+        <div className="admin-sidebar__top">
+          <div className="admin-sidebar__title">Admin Panel</div>
+
+          <nav className="admin-nav">
+            <NavLink
+              to="/admin/products"
+              className={({ isActive }) =>
+                "admin-nav__link" + (isActive ? " is-active" : "")
+              }
+            >
+              <span className="admin-nav__icon">🛒</span>
+              Produkte
+            </NavLink>
+
+            <NavLink
+              to="/admin/warehouses"
+              className={({ isActive }) =>
+                "admin-nav__link" + (isActive ? " is-active" : "")
+              }
+            >
+              <span className="admin-nav__icon">🏬</span>
+              Magazina
+            </NavLink>
+
+            <NavLink
+              to="/admin/inventory"
+              className={({ isActive }) =>
+                "admin-nav__link" + (isActive ? " is-active" : "")
+              }
+            >
+              <span className="admin-nav__icon">🔁</span>
+              Inventar (IN/OUT)
+            </NavLink>
+
+            <NavLink
+              to="/admin/orders"
+              className={({ isActive }) =>
+                "admin-nav__link" + (isActive ? " is-active" : "")
+              }
+            >
+              <span className="admin-nav__icon">📦</span>
+              Porosi
+            </NavLink>
+          </nav>
         </div>
 
-        <nav style={{ display: "grid", gap: 10 }}>
-          <Link to="/admin/products">📦 Produkte</Link>
-          <Link to="/admin/warehouses">🏬 Magazina</Link>
-          <Link to="/admin/inventory">🔄 Inventar (IN/OUT)</Link>
-          <Link to="/admin/orders">📑 Porosi</Link>
-        </nav>
-
-        <button
-          onClick={onLogout}
-          style={{
-            marginTop: 18,
-            width: "100%",
-            padding: 10,
-            borderRadius: 10,
-            border: "1px solid #111",
-            background: "#fff",
-          }}
-        >
-          Dil
-        </button>
+        <div className="admin-sidebar__bottom">
+          <button className="admin-logout" onClick={onLogout}>
+            Dil
+          </button>
+        </div>
       </aside>
 
-      <main style={{ flex: 1, padding: 18 }}>
-        <Outlet />
+      <main className="admin-main">
+        <div className="admin-content">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

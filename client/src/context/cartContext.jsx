@@ -1,44 +1,46 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useMemo, useState } from "react";
 
-const CartCtx = createContext(null);
+const CartContext = createContext(null);
 
-export const CartProvider = ({ children }) => {
-  const [items, setItems] = useState([]); // [{ product, qty }]
+export function CartProvider({ children }) {
+  const [items, setItems] = useState([]);
 
   const addToCart = (product, qty = 1) => {
-    const q = Number(qty) || 1;
+    const id = product?._id || product?.id;
+    if (!id) return;
+
     setItems((prev) => {
-      const idx = prev.findIndex((x) => x.product?._id === product?._id);
+      const idx = prev.findIndex((x) => (x._id || x.id) === id);
       if (idx >= 0) {
         const copy = [...prev];
-        copy[idx] = { ...copy[idx], qty: copy[idx].qty + q };
+        copy[idx] = { ...copy[idx], qty: (Number(copy[idx].qty) || 1) + qty };
         return copy;
       }
-      return [...prev, { product, qty: q }];
+      return [...prev, { ...product, qty }];
     });
   };
 
-  const removeFromCart = (productId) => {
-    setItems((prev) => prev.filter((x) => x.product?._id !== productId));
+  const removeFromCart = (id) => {
+    setItems((prev) => prev.filter((x) => (x._id || x.id) !== id));
   };
 
   const clearCart = () => setItems([]);
 
   const count = useMemo(
-    () => items.reduce((sum, x) => sum + (Number(x.qty) || 0), 0),
+    () => items.reduce((sum, it) => sum + (Number(it.qty) || 1), 0),
     [items]
   );
 
   const value = useMemo(
-    () => ({ items, count, addToCart, removeFromCart, clearCart }),
+    () => ({ items, setItems, addToCart, removeFromCart, clearCart, count }),
     [items, count]
   );
 
-  return <CartCtx.Provider value={value}>{children}</CartCtx.Provider>;
-};
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+}
 
-export const useCart = () => {
-  const ctx = useContext(CartCtx);
+export function useCart() {
+  const ctx = useContext(CartContext);
   if (!ctx) throw new Error("useCart must be used within CartProvider");
   return ctx;
-};
+}

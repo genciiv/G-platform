@@ -1,35 +1,93 @@
-import { Link, NavLink, useNavigate } from "react-router-dom";
-import { useCart } from "../../context/cart.jsx";
-import "./Header.css";
+import React, { useMemo, useState } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+
+import { useCart } from "../../context/cartContext.jsx";
+import { useAdminAuth } from "../../context/adminAuth.jsx";
+
+import "./header.css";
 
 export default function Header() {
-  const { count } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const onSearch = (e) => {
+  const { items, count } = useCart();
+  const { isAdmin, logout } = useAdminAuth();
+
+  const [q, setQ] = useState("");
+
+  const isAdminRoute = useMemo(
+    () => location.pathname.startsWith("/admin"),
+    [location.pathname]
+  );
+
+  const cartCount = useMemo(() => {
+    if (typeof count === "number") return count;
+    if (!items || !Array.isArray(items)) return 0;
+    return items.reduce((sum, it) => sum + (Number(it.qty) || 1), 0);
+  }, [items, count]);
+
+  function onSearch(e) {
     e.preventDefault();
-    const q = e.target.q.value.trim();
-    navigate(q ? `/products?q=${encodeURIComponent(q)}` : "/products");
-  };
+    const query = q.trim();
+    if (!query) return navigate("/products");
+    navigate(`/products?q=${encodeURIComponent(query)}`);
+  }
+
+  async function handleLogout() {
+    await logout();
+    navigate("/");
+  }
 
   return (
-    <header className="header">
-      <div className="header__inner">
-        <Link className="logo" to="/">
+    <header className="site-header">
+      <div className="header-inner">
+        <Link to="/" className="brand">
           G-App
         </Link>
 
         <form className="search" onSubmit={onSearch}>
-          <input name="q" placeholder="Kërko produkte..." />
-          <button type="submit">Kërko</button>
+          <input
+            className="search-input"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Kërko produkte..."
+          />
+          <button className="search-btn" type="submit">
+            Kërko
+          </button>
         </form>
 
         <nav className="nav">
-          <NavLink to="/products">Produkte</NavLink>
-          <NavLink to="/track">Gjurmim</NavLink>
-          <NavLink to="/cart">
-            Shporta <span className="badge">{count}</span>
+          <NavLink to="/products" className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}>
+            Produkte
           </NavLink>
+
+          <NavLink to="/track" className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}>
+            Gjurmim
+          </NavLink>
+
+          <NavLink to="/cart" className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}>
+            Shporta <span className="badge">{cartCount}</span>
+          </NavLink>
+
+          {!isAdmin ? (
+            <NavLink to="/admin/login" className="nav-link admin-btn">
+              Identifikohu
+            </NavLink>
+          ) : (
+            <>
+              <NavLink to="/admin/products" className="nav-link admin-btn">
+                Admin
+              </NavLink>
+
+              {/* ✅ Dil ne top NUK del kur je brenda /admin */}
+              {!isAdminRoute ? (
+                <button className="nav-link logout-btn" onClick={handleLogout} type="button">
+                  Dil
+                </button>
+              ) : null}
+            </>
+          )}
         </nav>
       </div>
     </header>

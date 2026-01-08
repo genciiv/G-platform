@@ -1,7 +1,9 @@
-import { Routes, Route, Navigate } from "react-router-dom";
-import Header from "./components/Header/Header.jsx";
+import React from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-// Public pages
+import Header from "./components/Header/Header.jsx";
+import "./styles/App.css";
+
 import Home from "./pages/Home/Home.jsx";
 import Products from "./pages/Products/Products.jsx";
 import ProductDetails from "./pages/ProductDetails/ProductDetails.jsx";
@@ -9,7 +11,6 @@ import Cart from "./pages/Cart/Cart.jsx";
 import Checkout from "./pages/Checkout/Checkout.jsx";
 import TrackOrder from "./pages/TrackOrder/TrackOrder.jsx";
 
-// Admin pages
 import AdminLogin from "./pages/Admin/Login/AdminLogin.jsx";
 import AdminLayout from "./pages/Admin/Layout/AdminLayout.jsx";
 import AdminProducts from "./pages/Admin/Products/AdminProducts.jsx";
@@ -20,51 +21,45 @@ import AdminOrders from "./pages/Admin/Orders/AdminOrders.jsx";
 import { useAdminAuth } from "./context/adminAuth.jsx";
 
 function AdminGuard({ children }) {
-  const { admin, loading } = useAdminAuth();
-
+  const { isAdmin, loading } = useAdminAuth();
   if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
-  if (!admin) return <Navigate to="/admin/login" replace />;
-
+  if (!isAdmin) return <Navigate to="/admin/login" replace />;
   return children;
 }
 
 export default function App() {
   return (
-    <div className="app">
+    <>
       <Header />
 
-      <main className="container">
-        <Routes>
-          {/* PUBLIC */}
-          <Route path="/" element={<Home />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/products/:id" element={<ProductDetails />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/track" element={<TrackOrder />} />
+      <Routes>
+        {/* PUBLIC */}
+        <Route path="/" element={<Home />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/products/:id" element={<ProductDetails />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/track" element={<TrackOrder />} />
 
-          {/* ADMIN */}
-          <Route path="/admin/login" element={<AdminLogin />} />
+        {/* ADMIN */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route
+          path="/admin"
+          element={
+            <AdminGuard>
+              <AdminLayout />
+            </AdminGuard>
+          }
+        >
+          <Route index element={<Navigate to="products" replace />} />
+          <Route path="products" element={<AdminProducts />} />
+          <Route path="warehouses" element={<AdminWarehouses />} />
+          <Route path="inventory" element={<AdminInventory />} />
+          <Route path="orders" element={<AdminOrders />} />
+        </Route>
 
-          <Route
-            path="/admin"
-            element={
-              <AdminGuard>
-                <AdminLayout />
-              </AdminGuard>
-            }
-          >
-            <Route index element={<Navigate to="products" replace />} />
-            <Route path="products" element={<AdminProducts />} />
-            <Route path="warehouses" element={<AdminWarehouses />} />
-            <Route path="inventory" element={<AdminInventory />} />
-            <Route path="orders" element={<AdminOrders />} />
-          </Route>
-
-          {/* fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
-    </div>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }

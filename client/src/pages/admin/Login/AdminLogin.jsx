@@ -1,73 +1,51 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import "./adminLogin.css";
 import { useAdminAuth } from "../../../context/adminAuth.jsx";
-import "./AdminLogin.css";
+import { useNavigate } from "react-router-dom";
 
 export default function AdminLogin() {
-  const navigate = useNavigate();
   const { login } = useAdminAuth();
+  const navigate = useNavigate();
 
   const [email, setEmail] = useState("admin@gapp.local");
   const [password, setPassword] = useState("Admin12345!");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (e) => {
+  async function onSubmit(e) {
     e.preventDefault();
     setError("");
-
-    if (!email.trim() || !password) {
-      setError("Email and password required");
-      return;
-    }
-
     try {
-      setLoading(true);
-      await login({ email: email.trim(), password });
-      navigate("/admin/products", { replace: true });
+      await login({ email, password }); // ✅ FIX
+      navigate("/admin/products");      // ✅ shko te admin
     } catch (err) {
-      const msg =
-        err?.response?.data?.message || err?.message || "Login failed";
-      setError(msg);
-    } finally {
-      setLoading(false);
+      setError(err?.response?.data?.message || "Invalid credentials");
     }
-  };
+  }
 
   return (
-    <div className="adminLogin">
-      <div className="adminLogin__card">
+    <div className="admin-login-page">
+      <div className="admin-login-card">
         <h1>Admin Login</h1>
         <p>Hyr për të menaxhuar dyqanin.</p>
 
         <form onSubmit={onSubmit}>
           <label>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@gapp.local"
-            autoComplete="username"
-          />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} />
 
           <label>Password</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="********"
-            autoComplete="current-password"
           />
 
-          {error ? <div className="adminLogin__error">{error}</div> : null}
+          {error ? <div className="admin-login-error">{error}</div> : null}
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Duke u futur..." : "Identifikohu"}
-          </button>
+          <button type="submit">Identifikohu</button>
         </form>
 
-        <div className="adminLogin__hint">
-          Nëse s’ke admin: hap <code>/api/auth/seed-admin</code> një herë.
+        <div className="admin-login-hint">
+          Nëse s’ke admin: hap <b>/api/auth/seed-admin</b> (vetëm lokal)
         </div>
       </div>
     </div>
