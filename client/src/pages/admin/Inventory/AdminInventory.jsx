@@ -1,4 +1,3 @@
-// client/src/pages/admin/Inventory/AdminInventory.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "./adminInventory.css";
 import { http, getErrMsg } from "../../../lib/api.js";
@@ -31,18 +30,29 @@ export default function AdminInventory() {
         http.get("/api/products"),
       ]);
 
-      const wItems = wRes.data?.items || [];
-      const pItems = pRes.data?.items || [];
+      // ✅ prano te dy formatet: array ose {items:[]}
+      const wData = wRes.data;
+      const pData = pRes.data;
 
-      setWarehouses(Array.isArray(wItems) ? wItems : []);
-      setProducts(
-        Array.isArray(pItems)
-          ? pItems.filter((x) => (x.active ?? true) === true)
-          : []
-      );
+      const wItems = Array.isArray(wData) ? wData : wData?.items || [];
+      const pItems = Array.isArray(pData) ? pData : pData?.items || [];
 
-      const first = wItems?.[0]?._id || "";
-      setWarehouseId(first);
+      const safeWarehouses = Array.isArray(wItems) ? wItems : [];
+      const safeProducts = Array.isArray(pItems) ? pItems : [];
+
+      setWarehouses(safeWarehouses);
+
+      const activeProducts = safeProducts.filter((x) => (x.active ?? true) === true);
+      setProducts(activeProducts);
+
+      // ✅ zgjidh automatikisht magazinen e pare nese s’ka te zgjedhur
+      const firstWhId = safeWarehouses?.[0]?._id || "";
+      setWarehouseId((prev) => prev || firstWhId);
+
+      // ✅ zgjidh edhe produktin e pare per lehtësi (opsionale)
+      const firstProdId = activeProducts?.[0]?._id || "";
+      setProductId((prev) => prev || firstProdId);
+
     } catch (e) {
       setErr(getErrMsg(e, "Bootstrap failed"));
     } finally {
@@ -56,17 +66,23 @@ export default function AdminInventory() {
       setMovements([]);
       return;
     }
+
     setErr("");
     try {
       const [sRes, mRes] = await Promise.all([
         http.get(`/api/inventory/stock?warehouseId=${encodeURIComponent(whId)}`),
-        http.get(
-          `/api/inventory/movements?warehouseId=${encodeURIComponent(whId)}`
-        ),
+        http.get(`/api/inventory/movements?warehouseId=${encodeURIComponent(whId)}`),
       ]);
 
-      setStock(Array.isArray(sRes.data?.items) ? sRes.data.items : []);
-      setMovements(Array.isArray(mRes.data?.items) ? mRes.data.items : []);
+      // ✅ prano array ose {items:[]}
+      const sData = sRes.data;
+      const mData = mRes.data;
+
+      const sItems = Array.isArray(sData) ? sData : sData?.items || [];
+      const mItems = Array.isArray(mData) ? mData : mData?.items || [];
+
+      setStock(Array.isArray(sItems) ? sItems : []);
+      setMovements(Array.isArray(mItems) ? mItems : []);
     } catch (e) {
       setErr(getErrMsg(e, "S’u arrit të merren të dhënat e inventarit"));
     }
@@ -86,9 +102,10 @@ export default function AdminInventory() {
     return w ? `${w.name}${w.code ? ` (${w.code})` : ""}` : "-";
   }, [warehouses, warehouseId]);
 
-  const stockTotalQty = useMemo(() => {
-    return stock.reduce((s, x) => s + Number(x.qty ?? x.quantity ?? 0), 0);
-  }, [stock]);
+  const stockTotalQty = useMemo(
+    () => stock.reduce((s, x) => s + Number(x.qty || x.quantity || x.stock || 0), 0),
+    [stock]
+  );
 
   async function submitMove(e) {
     e.preventDefault();
@@ -100,7 +117,7 @@ export default function AdminInventory() {
 
     setBusy(true);
     try {
-      // ✅ KRYESORE: serveri pret "quantity"
+      // ✅ serveri yt (nga kodi qe solle) pret "quantity", jo "qty"
       await http.post("/api/inventory/move", {
         warehouseId,
         productId,
@@ -187,7 +204,7 @@ export default function AdminInventory() {
               <option value="">-- zgjidh produkt --</option>
               {products.map((p) => (
                 <option key={p._id} value={p._id}>
-                  {p.title}
+                  {p.title || p.name}
                   {p.sku ? ` (SKU: ${p.sku})` : ""}
                 </option>
               ))}
@@ -227,11 +244,7 @@ export default function AdminInventory() {
               placeholder="opsionale"
             />
 
-            <button
-              className="ai-btn ai-btn--primary"
-              disabled={busy}
-              type="submit"
-            >
+            <button className="ai-btn ai-btn--primary" disabled={busy} type="submit">
               {busy ? "Duke ruajtur..." : "Ruaj lëvizjen"}
             </button>
           </form>
@@ -265,11 +278,9 @@ export default function AdminInventory() {
                 <tbody>
                   {stock.map((s) => (
                     <tr key={s._id}>
-                      <td className="ai-strong">{s.productId?.title || "-"}</td>
-                      <td className="ai-sub">{s.productId?.sku || "-"}</td>
-                      <td className="ai-right ai-strong">
-                        {Number(s.qty ?? s.quantity ?? 0)}
-                      </td>
+                      <td className="ai-strong">{s.productId?.title || s.product?.title || "-"}</td>
+                      <td className="ai-sub">{s.productId?.sku || s.product?.sku || "-"}</td>
+                      <td className="ai-right ai-strong">{Number(s.qty || s.quantity || s.stock || 0)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -303,20 +314,13 @@ export default function AdminInventory() {
                   {movements.map((m) => (
                     <tr key={m._id}>
                       <td className="ai-sub">{fmt(m.createdAt)}</td>
-                      <td className="ai-strong">{m.productId?.title || "-"}</td>
+                      <td className="ai-strong">{m.productId?.title || m.product?.title || "-"}</td>
                       <td>
-                        <span
-                          className={
-                            "ai-pill " +
-                            (m.type === "IN" ? "is-green" : "is-red")
-                          }
-                        >
+                        <span className={"ai-pill " + (m.type === "IN" ? "is-green" : "is-red")}>
                           {m.type}
                         </span>
                       </td>
-                      <td className="ai-right ai-strong">
-                        {Number(m.qty ?? m.quantity ?? 0)}
-                      </td>
+                      <td className="ai-right ai-strong">{Number(m.qty || m.quantity || 0)}</td>
                       <td className="ai-sub">{m.reason || "-"}</td>
                       <td className="ai-sub">{m.note || "-"}</td>
                     </tr>
