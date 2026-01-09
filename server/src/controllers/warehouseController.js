@@ -1,79 +1,98 @@
 import Warehouse from "../models/Warehouse.js";
 
-/**
- * GET /api/warehouses
- */
-export const listWarehouses = async (req, res) => {
-  try {
-    const warehouses = await Warehouse.find().sort({ createdAt: -1 });
-    res.json(warehouses);
-  } catch (err) {
-    console.error("listWarehouses:", err.message);
-    res.status(500).json({ message: "Failed to fetch warehouses" });
-  }
-};
+function makeCodeFromName(name = "") {
+  const clean = String(name)
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+  return clean ? `WH-${clean}` : `WH-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+}
 
-/**
- * POST /api/warehouses
- */
-export const createWarehouse = async (req, res) => {
-  try {
-    const { name, location } = req.body;
+function normalizeCode(code) {
+  return String(code || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "-");
+}
 
-    if (!name) {
-      return res.status(400).json({ message: "Warehouse name is required" });
+export async function getWarehouses(req, res) {
+  const items = await Warehouse.find({}).sort({ createdAt: -1 });
+  return res.json(items);
+}
+
+export async function createWarehouse(req, res) {
+  try {
+    const { name, code, location, active } = req.body;
+
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ message: "Name is required" });
     }
 
-    const warehouse = await Warehouse.create({
-      name,
-      location: location || "",
+    const finalCode = normalizeCode(code) || makeCodeFromName(name);
+
+    const doc = await Warehouse.create({
+      name: String(name).trim(),
+      code: finalCode,
+      location: String(location || "").trim(),
+      active: active !== false,
     });
 
-    res.status(201).json(warehouse);
+    return res.status(201).json(doc);
   } catch (err) {
-    console.error("createWarehouse:", err.message);
-    res.status(500).json({ message: "Failed to create warehouse" });
-  }
-};
+    // duplicate key error (code unique)
+    if (err?.code === 11000) {
+      return res.status(400).json({ message: "Kodi ekziston. Përdor një kod tjetër." });
+    }
 
-/**
- * PATCH /api/warehouses/:id
- */
-export const updateWarehouse = async (req, res) => {
+    // mongoose validation
+    if (err?.name === "ValidationError") {
+      return res.status(400).json({ message: err.message });
+    }
+
+    console.error("createWarehouse error:", err);
+    return res.status(500).json({ message: "Server error creating warehouse" });
+  }
+}
+
+export async function updateWarehouse(req, res) {
   try {
     const { id } = req.params;
+    const { name, code, location, active } = req.body;
 
-    const warehouse = await Warehouse.findByIdAndUpdate(id, req.body, {
+    const patch = {};
+    if (name !== undefined) patch.name = String(name).trim();
+    if (code !== undefined) patch.code = normalizeCode(code);
+    if (location !== undefined) patch.location = String(location).trim();
+    if (active !== undefined) patch.active = !!active;
+
+    const updated = await Warehouse.findByIdAndUpdate(id, patch, {
       new: true,
+      runValidators: true,
     });
 
-    if (!warehouse) {
-      return res.status(404).json({ message: "Warehouse not found" });
-    }
-
-    res.json(warehouse);
+    if (!updated) return res.status(404).json({ message: "Warehouse not found" });
+    return res.json(updated);
   } catch (err) {
-    console.error("updateWarehouse:", err.message);
-    res.status(500).json({ message: "Failed to update warehouse" });
+    if (err?.code === 11000) {
+      return res.status(400).json({ message: "Kodi ekziston. Përdor një kod tjetër." });
+    }
+    if (err?.name === "ValidationError") {
+      return res.status(400).json({ message: err.message });
+    }
+    console.error("updateWarehouse error:", err);
+    return res.status(500).json({ message: "Server error updating warehouse" });
   }
-};
+}
 
-/**
- * DELETE /api/warehouses/:id
- */
-export const deleteWarehouse = async (req, res) => {
+export async function deleteWarehouse(req, res) {
   try {
     const { id } = req.params;
-
-    const warehouse = await Warehouse.findByIdAndDelete(id);
-
-    if (!warehouse) {
-      return res.status(404).json({ message: "Warehouse not found" });
-    }
-
-    res.json({ message: "Warehouse deleted" });
+    const deleted = await Warehouse.findByIdAndDelete(id);
+    if (!deleted) return res.status(404).json({ message: "Warehouse not found" });
+    return res.json({ ok: true });
   } catch (err) {
-    console.error("deleteWarehouse:", err.message);
-    res.status(500).json({ message: "Failed to delete warehouse" });
+    console.error("deleteWarehouse error:", err);
+    return res.status(500).json({ message: "Server error deleting warehouse" });
   }
-};
+}

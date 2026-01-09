@@ -5,21 +5,23 @@ import Product from "../models/Product.js";
 import Warehouse from "../models/Warehouse.js";
 
 /**
- * POST /api/inventory/movements
+ * POST /api/inventory/move
  * Body:
  * {
  *   warehouseId,
  *   productId,
  *   type: "IN" | "OUT",
- *   quantity: number,
+ *   quantity: number (REQUIRED)  // pranojmë edhe qty
+ *   reason?: string,
  *   note?: string
  * }
  */
 export const createMovement = async (req, res) => {
   try {
-    const { warehouseId, productId, type, quantity, note } = req.body;
+    const { warehouseId, productId, type, quantity, qty, reason, note } =
+      req.body;
 
-    const qty = Number(quantity);
+    const q = Number(quantity ?? qty);
 
     if (!warehouseId || !mongoose.Types.ObjectId.isValid(warehouseId)) {
       return res.status(400).json({ message: "Invalid warehouseId" });
@@ -30,11 +32,10 @@ export const createMovement = async (req, res) => {
     if (!["IN", "OUT"].includes(type)) {
       return res.status(400).json({ message: "type must be IN or OUT" });
     }
-    if (!Number.isFinite(qty) || qty <= 0) {
+    if (!Number.isFinite(q) || q <= 0) {
       return res.status(400).json({ message: "quantity must be > 0" });
     }
 
-    // Ensure warehouse & product exist
     const [warehouse, product] = await Promise.all([
       Warehouse.findById(warehouseId),
       Product.findById(productId),
@@ -44,10 +45,9 @@ export const createMovement = async (req, res) => {
       return res.status(404).json({ message: "Warehouse not found" });
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    // If OUT, ensure enough stock
     if (type === "OUT") {
       const currentStock = await getProductStockNumber(warehouseId, productId);
-      if (currentStock < qty) {
+      if (currentStock < q) {
         return res.status(400).json({
           message: `Not enough stock. Available: ${currentStock}`,
         });
@@ -58,37 +58,41 @@ export const createMovement = async (req, res) => {
       warehouseId,
       productId,
       type,
-      quantity: qty,
+      quantity: q,
+      reason: reason || "",
       note: note || "",
-      createdBy: req.user?.id || null, // admin/staff user id (if auth enabled)
+      createdBy: req.user?.id || null,
     });
 
     const populated = await InventoryMovement.findById(mv._id)
-      .populate("warehouseId", "name location")
-      .populate("productId", "name price sku")
-      .sort({ createdAt: -1 });
+      .populate("warehouseId", "name code location")
+      .populate("productId", "title sku")
+      .lean();
 
-    return res.json(populated);
+    // ✅ kthejmë qty në response që client të jetë happy
+    return res.json({
+      ...populated,
+      qty: populated.quantity,
+    });
   } catch (err) {
-    console.error("❌ createMovement error:", err.message);
-    return res.status(500).json({ message: "Failed to create movement" });
+    console.error("❌ createMovement error:", err);
+    return res.status(500).json({ message: err?.message || "Failed to create movement" });
   }
 };
 
 /**
- * GET /api/inventory/stock/:warehouseId
- * Returns:
- * [{ productId, stock, product }]
+ * GET /api/inventory/stock?warehouseId=...
+ * (pranon edhe /api/inventory/stock/:warehouseId)
  */
 export const getStockByWarehouse = async (req, res) => {
   try {
-    const { warehouseId } = req.params;
+    const warehouseId = req.query.warehouseId || req.params.warehouseId;
 
     if (!warehouseId || !mongoose.Types.ObjectId.isValid(warehouseId)) {
       return res.status(400).json({ message: "Invalid warehouseId" });
     }
 
-    const wh = await Warehouse.findById(warehouseId).select("_id name");
+    const wh = await Warehouse.findById(warehouseId).select("_id name code");
     if (!wh) return res.status(404).json({ message: "Warehouse not found" });
 
     const rows = await InventoryMovement.aggregate([
@@ -96,7 +100,7 @@ export const getStockByWarehouse = async (req, res) => {
       {
         $group: {
           _id: "$productId",
-          stock: {
+          qty: {
             $sum: {
               $cond: [
                 { $eq: ["$type", "IN"] },
@@ -107,35 +111,34 @@ export const getStockByWarehouse = async (req, res) => {
           },
         },
       },
-      { $sort: { stock: -1 } },
+      { $sort: { qty: -1 } },
     ]);
 
     const productIds = rows.map((r) => r._id);
-    const products = await Product.find({ _id: { $in: productIds } }).select(
-      "name price sku images"
-    );
+    const products = await Product.find({ _id: { $in: productIds } })
+      .select("title sku")
+      .lean();
 
     const productMap = new Map(products.map((p) => [String(p._id), p]));
 
-    const out = rows.map((r) => ({
-      productId: r._id,
-      stock: r.stock,
-      product: productMap.get(String(r._id)) || null,
+    const items = rows.map((r) => ({
+      _id: `${warehouseId}_${String(r._id)}`,
+      productId: productMap.get(String(r._id)) ? productMap.get(String(r._id)) : { _id: r._id },
+      qty: r.qty,
     }));
 
     return res.json({
       warehouse: wh,
-      items: out,
+      items,
     });
   } catch (err) {
-    console.error("❌ getStockByWarehouse error:", err.message);
-    return res.status(500).json({ message: "Failed to get stock" });
+    console.error("❌ getStockByWarehouse error:", err);
+    return res.status(500).json({ message: err?.message || "Failed to get stock" });
   }
 };
 
 /**
  * GET /api/inventory/movements?warehouseId=&productId=&type=&page=&limit=
- * Returns paginated movements list for admin.
  */
 export const listMovements = async (req, res) => {
   try {
@@ -164,15 +167,21 @@ export const listMovements = async (req, res) => {
       filter.type = type;
     }
 
-    const [items, total] = await Promise.all([
+    const [itemsRaw, total] = await Promise.all([
       InventoryMovement.find(filter)
-        .populate("warehouseId", "name location")
-        .populate("productId", "name price sku")
+        .populate("warehouseId", "name code location")
+        .populate("productId", "title sku")
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
-        .limit(limit),
+        .limit(limit)
+        .lean(),
       InventoryMovement.countDocuments(filter),
     ]);
+
+    const items = itemsRaw.map((m) => ({
+      ...m,
+      qty: m.quantity,
+    }));
 
     return res.json({
       page,
@@ -182,15 +191,12 @@ export const listMovements = async (req, res) => {
       items,
     });
   } catch (err) {
-    console.error("❌ listMovements error:", err.message);
-    return res.status(500).json({ message: "Failed to fetch movements" });
+    console.error("❌ listMovements error:", err);
+    return res.status(500).json({ message: err?.message || "Failed to fetch movements" });
   }
 };
 
-/* =========================
-   Helpers (internal)
-   ========================= */
-
+/* Helpers */
 async function getProductStockNumber(warehouseId, productId) {
   const agg = await InventoryMovement.aggregate([
     {

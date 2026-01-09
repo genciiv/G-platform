@@ -59,9 +59,7 @@ export default function AdminInventory() {
     setErr("");
     try {
       const [sRes, mRes] = await Promise.all([
-        http.get(
-          `/api/inventory/stock?warehouseId=${encodeURIComponent(whId)}`
-        ),
+        http.get(`/api/inventory/stock?warehouseId=${encodeURIComponent(whId)}`),
         http.get(
           `/api/inventory/movements?warehouseId=${encodeURIComponent(whId)}`
         ),
@@ -88,10 +86,9 @@ export default function AdminInventory() {
     return w ? `${w.name}${w.code ? ` (${w.code})` : ""}` : "-";
   }, [warehouses, warehouseId]);
 
-  const stockTotalQty = useMemo(
-    () => stock.reduce((s, x) => s + Number(x.qty || 0), 0),
-    [stock]
-  );
+  const stockTotalQty = useMemo(() => {
+    return stock.reduce((s, x) => s + Number(x.qty ?? x.quantity ?? 0), 0);
+  }, [stock]);
 
   async function submitMove(e) {
     e.preventDefault();
@@ -103,16 +100,16 @@ export default function AdminInventory() {
 
     setBusy(true);
     try {
+      // ✅ KRYESORE: serveri pret "quantity"
       await http.post("/api/inventory/move", {
         warehouseId,
         productId,
         type,
-        qty: Number(qty),
+        quantity: Number(qty),
         reason,
         note,
       });
 
-      // reset small fields
       setQty(1);
       setReason("");
       setNote("");
@@ -271,7 +268,7 @@ export default function AdminInventory() {
                       <td className="ai-strong">{s.productId?.title || "-"}</td>
                       <td className="ai-sub">{s.productId?.sku || "-"}</td>
                       <td className="ai-right ai-strong">
-                        {Number(s.qty || 0)}
+                        {Number(s.qty ?? s.quantity ?? 0)}
                       </td>
                     </tr>
                   ))}
@@ -318,7 +315,7 @@ export default function AdminInventory() {
                         </span>
                       </td>
                       <td className="ai-right ai-strong">
-                        {Number(m.qty || 0)}
+                        {Number(m.qty ?? m.quantity ?? 0)}
                       </td>
                       <td className="ai-sub">{m.reason || "-"}</td>
                       <td className="ai-sub">{m.note || "-"}</td>

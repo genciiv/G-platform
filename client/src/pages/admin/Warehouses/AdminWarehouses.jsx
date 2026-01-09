@@ -1,4 +1,3 @@
-// client/src/pages/admin/Warehouses/AdminWarehouses.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "./adminWarehouses.css";
 import { http, getErrMsg } from "../../../lib/api.js";
@@ -21,7 +20,13 @@ export default function AdminWarehouses() {
     setLoading(true);
     try {
       const res = await http.get("/api/warehouses");
-      const list = res.data?.items || [];
+
+      // ✅ suporton te dy formatet:
+      // 1) res.json(itemsArray)
+      // 2) res.json({ items: itemsArray })
+      const data = res.data;
+      const list = Array.isArray(data) ? data : data?.items || [];
+
       setItems(Array.isArray(list) ? list : []);
     } catch (e) {
       setErr(getErrMsg(e, "S’u arrit të merren magazinat"));
@@ -61,11 +66,13 @@ export default function AdminWarehouses() {
     setErr("");
     try {
       const payload = { name, code, location, active };
+
       if (editing?._id) {
         await http.put(`/api/warehouses/${editing._id}`, payload);
       } else {
         await http.post("/api/warehouses", payload);
       }
+
       setOpen(false);
       resetForm();
       await load();
@@ -75,7 +82,7 @@ export default function AdminWarehouses() {
   }
 
   async function remove(id) {
-    if (!confirm("Ta fshij këtë magazinë?")) return;
+    if (!window.confirm("Ta fshij këtë magazinë?")) return;
     setErr("");
     try {
       await http.delete(`/api/warehouses/${id}`);
@@ -146,10 +153,10 @@ export default function AdminWarehouses() {
                   <td>
                     <span
                       className={
-                        "aw-pill " + (w.active ?? true ? "is-green" : "is-gray")
+                        "aw-pill " + ((w.active ?? true) ? "is-green" : "is-gray")
                       }
                     >
-                      {w.active ?? true ? "Active" : "Inactive"}
+                      {(w.active ?? true) ? "Active" : "Inactive"}
                     </span>
                   </td>
                   <td className="aw-actions-cell">
