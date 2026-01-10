@@ -1,22 +1,18 @@
-// client/src/components/Header/Header.jsx
 import React, { useMemo, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-
 import { useCart } from "../../context/cartContext.jsx";
 import { useAdminAuth } from "../../context/adminAuth.jsx";
-
 import "./header.css";
 
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
-
   const { items } = useCart();
-  const { isAdmin } = useAdminAuth();
+  const { isAdmin, logout } = useAdminAuth();
 
   const [q, setQ] = useState("");
 
-  const inAdmin = location.pathname.startsWith("/admin");
+  const isAdminRoute = location.pathname.startsWith("/admin");
 
   const cartCount = useMemo(() => {
     if (!items || !Array.isArray(items)) return 0;
@@ -28,6 +24,11 @@ export default function Header() {
     const query = q.trim();
     if (!query) return navigate("/products");
     navigate(`/products?q=${encodeURIComponent(query)}`);
+  }
+
+  async function handleLogout() {
+    await logout();
+    navigate("/admin/login");
   }
 
   return (
@@ -77,16 +78,26 @@ export default function Header() {
             Shporta <span className="badge">{cartCount}</span>
           </NavLink>
 
-          {!isAdmin ? (
-            <NavLink to="/admin/login" className="nav-link admin-btn">
-              Identifikohu
-            </NavLink>
-          ) : (
-            // kur je admin: shfaq vetëm "Admin" (pa "Dil" në header)
-            <NavLink to="/admin/products" className="nav-link admin-btn">
-              Admin
-            </NavLink>
-          )}
+          {/* Ketu: nese jemi ne admin route, mos shfaq login/logout ne header */}
+          {!isAdminRoute &&
+            (!isAdmin ? (
+              <NavLink to="/admin/login" className="nav-link admin-btn">
+                Identifikohu
+              </NavLink>
+            ) : (
+              <>
+                <NavLink to="/admin/products" className="nav-link admin-btn">
+                  Admin
+                </NavLink>
+                <button
+                  className="nav-link logout-btn"
+                  onClick={handleLogout}
+                  type="button"
+                >
+                  Dil
+                </button>
+              </>
+            ))}
         </nav>
       </div>
     </header>
