@@ -1,0 +1,67 @@
+.os-wrap{
+  padding: 28px 16px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.os-card{
+  background: #fff;
+  border: 1px solid #e9e9ef;
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+}
+
+.os-card h1{
+  margin: 0 0 6px 0;
+  font-size: 30px;
+}
+
+.os-card p{
+  margin: 0 0 18px 0;
+  color: #555;
+}
+
+.os-codeBox{
+  border: 1px dashed #cfd3df;
+  border-radius: 14px;
+  padding: 14px;
+  background: #fafbff;
+  margin-bottom: 18px;
+}
+
+.os-codeLabel{
+  font-size: 13px;
+  color: #667;
+  margin-bottom: 6px;
+}
+
+.os-code{
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.os-actions{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.os-btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #111827;
+  background: #111827;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.os-btn--ghost{
+  background: #fff;
+  color: #111827;
+}

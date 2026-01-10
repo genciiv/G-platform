@@ -1,118 +1,221 @@
 // server/src/controllers/orderController.js
+import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 
-function genOrderCode() {
-  // p.sh. G-20260108-482193
+// Helper për orderCode
+function makeOrderCode() {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const rand = Math.floor(100000 + Math.random() * 900000);
-  return `G-${y}${m}${day}-${rand}`;
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const rand = Math.floor(100000 + Math.random() * 900000); // 6 shifra
+  return `G-${yyyy}${mm}${dd}-${rand}`;
 }
 
-// POST /api/orders
-export async function createOrder(req, res) {
-  const { customerName, phone, address, note, items } = req.body || {};
+// Normalizim telefoni: pranon 069..., 355..., +355..., 00...
+function normalizePhone(v = "") {
+  let digits = String(v || "")
+    .trim()
+    .replace(/\D/g, ""); // vetëm shifra
 
-  if (!customerName || !phone || !address) {
-    return res
-      .status(400)
-      .json({ message: "Name, phone and address are required" });
-  }
-  if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ message: "Cart items are required" });
-  }
+  // 00xxx -> xxx
+  if (digits.startsWith("00")) digits = digits.slice(2);
 
-  // Normalize items
-  const normalized = items
-    .map((it) => ({
-      productId: it.productId || it._id || it.id,
-      qty: Number(it.qty || 1),
-    }))
-    .filter((x) => x.productId && x.qty > 0);
+  // 355xxx -> xxx (Albania)
+  if (digits.startsWith("355")) digits = digits.slice(3);
 
-  if (normalized.length === 0) {
-    return res.status(400).json({ message: "Invalid items" });
-  }
+  // nëse mbetet 9 shifra dhe fillon me 6 -> shto 0 përpara (069...)
+  if (digits.length === 9 && digits.startsWith("6")) digits = "0" + digits;
 
-  // Fetch products to validate + get title/price
-  const ids = normalized.map((x) => x.productId);
-  const prods = await Product.find({ _id: { $in: ids } });
+  return digits;
+}
 
-  const map = new Map(prods.map((p) => [String(p._id), p]));
-  const orderItems = normalized
-    .map((x) => {
-      const p = map.get(String(x.productId));
-      if (!p) return null;
+/**
+ * POST /api/orders
+ * body:
+ * {
+ *   customerName, phone, address, note?,
+ *   items: [{ productId, qty }]
+ * }
+ */
+export const createOrder = async (req, res) => {
+  try {
+    const { customerName, phone, address, note, items } = req.body;
+
+    if (!customerName || !String(customerName).trim()) {
+      return res.status(400).json({ message: "customerName is required" });
+    }
+    if (!phone || !String(phone).trim()) {
+      return res.status(400).json({ message: "phone is required" });
+    }
+    if (!address || !String(address).trim()) {
+      return res.status(400).json({ message: "address is required" });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "items are required" });
+    }
+
+    // normalizo items
+    const cleanItems = items
+      .map((it) => ({
+        productId: it?.productId,
+        qty: Number(it?.qty || 0),
+      }))
+      .filter(
+        (it) => mongoose.Types.ObjectId.isValid(it.productId) && it.qty > 0
+      );
+
+    if (cleanItems.length === 0) {
+      return res.status(400).json({ message: "items invalid" });
+    }
+
+    // Merr produktet për cmime/tituj
+    const productIds = cleanItems.map((x) => x.productId);
+    const products = await Product.find({ _id: { $in: productIds } }).select(
+      "title name price sku"
+    );
+
+    const pMap = new Map(products.map((p) => [String(p._id), p]));
+
+    const orderItems = cleanItems.map((it) => {
+      const p = pMap.get(String(it.productId));
+      const title = p?.title || p?.name || "Produkt";
+      const price = Number(p?.price || 0);
       return {
-        productId: p._id,
-        title: p.title,
-        price: Number(p.price || 0),
-        qty: x.qty,
+        productId: it.productId,
+        title,
+        price,
+        qty: it.qty,
       };
-    })
-    .filter(Boolean);
+    });
 
-  if (orderItems.length === 0) {
-    return res.status(400).json({ message: "Products not found" });
+    const total = orderItems.reduce(
+      (s, x) => s + Number(x.price || 0) * Number(x.qty || 0),
+      0
+    );
+
+    // Gjenero kod unik (me retry)
+    let orderCode = makeOrderCode();
+    for (let i = 0; i < 8; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      const exists = await Order.findOne({ orderCode }).select("_id");
+      if (!exists) break;
+      orderCode = makeOrderCode();
+    }
+
+    const doc = await Order.create({
+      orderCode,
+      customerName: String(customerName).trim(),
+      phone: String(phone).trim(),
+      address: String(address).trim(),
+      note: String(note || "").trim(),
+      status: "Pending",
+      total,
+      items: orderItems,
+    });
+
+    return res.status(201).json(doc);
+  } catch (err) {
+    console.error("❌ createOrder error:", err);
+    return res.status(500).json({ message: "Failed to create order" });
   }
+};
 
-  const total = orderItems.reduce((sum, it) => sum + it.price * it.qty, 0);
+/**
+ * GET /api/orders/track?code=...&phone=...
+ * GET /api/orders/track/:orderCode?phone=...
+ */
+export const trackOrder = async (req, res) => {
+  try {
+    const orderCode = String(
+      req.params.orderCode || req.query.code || ""
+    ).trim();
 
-  // generate unique code (retry few times)
-  let orderCode = genOrderCode();
-  for (let i = 0; i < 5; i++) {
-    // eslint-disable-next-line no-await-in-loop
-    const exists = await Order.findOne({ orderCode });
-    if (!exists) break;
-    orderCode = genOrderCode();
+    const phoneIn = String(req.query.phone || "").trim();
+
+    if (!orderCode) {
+      return res.status(400).json({ message: "Order code is required" });
+    }
+    if (!phoneIn) {
+      return res.status(400).json({ message: "Phone is required" });
+    }
+
+    // gjej porosinë vetëm me code
+    const order = await Order.findOne({ orderCode })
+      .populate("items.productId", "title name price sku")
+      .select("-__v");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // verifiko telefonin me normalizim (pranon +355 / 0...)
+    if (normalizePhone(order.phone) !== normalizePhone(phoneIn)) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    return res.json(order);
+  } catch (err) {
+    console.error("❌ trackOrder error:", err);
+    return res.status(500).json({ message: "Failed to track order" });
   }
+};
 
-  const doc = await Order.create({
-    orderCode,
-    customerName: String(customerName).trim(),
-    phone: String(phone).trim(),
-    address: String(address).trim(),
-    note: note ? String(note).trim() : "",
-    items: orderItems,
-    total,
-    status: "Pending",
-  });
+/**
+ * ADMIN: GET /api/orders?q=
+ */
+export const listOrders = async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
 
-  res.status(201).json({ orderCode: doc.orderCode, order: doc });
-}
+    const filter = {};
+    if (q) {
+      filter.$or = [
+        { orderCode: new RegExp(q, "i") },
+        { customerName: new RegExp(q, "i") },
+        { phone: new RegExp(q, "i") },
+      ];
+    }
 
-// GET /api/orders/track/:orderCode
-export async function trackOrder(req, res) {
-  const { orderCode } = req.params;
-  const doc = await Order.findOne({ orderCode: String(orderCode).trim() });
-  if (!doc) return res.status(404).json({ message: "Order not found" });
-  res.json({ order: doc });
-}
+    const items = await Order.find(filter)
+      .sort({ createdAt: -1 })
+      .select("-__v");
 
-// GET /api/orders (admin list)
-export async function listOrders(req, res) {
-  const docs = await Order.find().sort({ createdAt: -1 });
-  res.json({ items: docs });
-}
-
-// PATCH /api/orders/:id/status
-export async function updateOrderStatus(req, res) {
-  const { id } = req.params;
-  const { status } = req.body || {};
-
-  const allowed = ["Pending", "Shipped", "Delivered", "Cancelled"];
-  if (!allowed.includes(status)) {
-    return res.status(400).json({ message: "Invalid status" });
+    return res.json({ items });
+  } catch (err) {
+    console.error("❌ listOrders error:", err);
+    return res.status(500).json({ message: "Failed to list orders" });
   }
+};
 
-  const doc = await Order.findById(id);
-  if (!doc) return res.status(404).json({ message: "Order not found" });
+/**
+ * ADMIN: PATCH /api/orders/:id/status
+ * body: { status }
+ */
+export const updateOrderStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const status = String(req.body?.status || "").trim();
 
-  doc.status = status;
-  await doc.save();
+    const allowed = ["Pending", "Shipped", "Delivered", "Cancelled"];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
 
-  res.json({ order: doc });
-}
+    const updated = await Order.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    ).select("-__v");
+
+    if (!updated) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("❌ updateOrderStatus error:", err);
+    return res.status(500).json({ message: "Failed to update status" });
+  }
+};

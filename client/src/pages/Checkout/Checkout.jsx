@@ -1,3 +1,4 @@
+// client/src/pages/Checkout/Checkout.jsx
 import React, { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./checkout.css";
@@ -18,7 +19,7 @@ export default function Checkout() {
 
   const total = useMemo(
     () =>
-      items.reduce(
+      (items || []).reduce(
         (sum, it) => sum + Number(it.price || 0) * (Number(it.qty) || 1),
         0
       ),
@@ -29,7 +30,7 @@ export default function Checkout() {
     e.preventDefault();
     setErr("");
 
-    if (items.length === 0) return setErr("Shporta është bosh.");
+    if (!items || items.length === 0) return setErr("Shporta është bosh.");
     if (!customerName.trim()) return setErr("Emri është i detyrueshëm.");
     if (!phone.trim()) return setErr("Telefoni është i detyrueshëm.");
     if (!address.trim()) return setErr("Adresa është e detyrueshme.");
@@ -42,18 +43,27 @@ export default function Checkout() {
         address: address.trim(),
         note: note.trim(),
         items: items.map((it) => ({
-          productId: it._id || it.id,
+          productId: it.productId || it._id || it.id,
           qty: Number(it.qty || 1),
         })),
       };
 
       const res = await http.post("/api/orders", payload);
-      const code = res.data?.orderCode;
+
+      const code = res.data?.orderCode || "";
+      const ph = phone.trim();
 
       clearCart();
 
-      if (code) navigate(`/track?code=${encodeURIComponent(code)}`);
-      else navigate("/track");
+      if (code) {
+        navigate(
+          `/track?code=${encodeURIComponent(code)}&phone=${encodeURIComponent(
+            ph
+          )}`
+        );
+      } else {
+        navigate("/track");
+      }
     } catch (e2) {
       setErr(getErrMsg(e2, "Nuk u krijua porosia"));
     } finally {
@@ -107,12 +117,12 @@ export default function Checkout() {
         <div className="co-card">
           <h2>Porosia</h2>
 
-          {items.length === 0 ? (
+          {!items || items.length === 0 ? (
             <div style={{ color: "#6b7280" }}>Shporta është bosh.</div>
           ) : (
             <div className="co-lines">
-              {items.map((it) => {
-                const id = it._id || it.id;
+              {items.map((it, idx) => {
+                const id = it.productId || it._id || it.id || idx;
                 const title = it.title || it.name || "Produkt";
                 const qty = Number(it.qty || 1);
                 const price = Number(it.price || 0);
