@@ -1,0 +1,49 @@
+/* client/src/pages/Auth/account.css */
+.acc-wrap {
+  width: min(680px, calc(100% - 32px));
+  margin: 28px auto 60px;
+}
+
+.acc-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.acc-card h1 {
+  margin: 0 0 14px;
+}
+
+.acc-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.acc-k {
+  color: #6b7280;
+}
+
+.acc-v {
+  font-weight: 600;
+  color: #111827;
+}
+
+.acc-btn {
+  margin-top: 14px;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: #ef4444;
+  color: #fff;
+  cursor: pointer;
+}
+
+.acc-note {
+  margin-top: 12px;
+  color: #6b7280;
+  font-size: 14px;
+}

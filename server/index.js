@@ -4,24 +4,25 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import dotenv from "dotenv";
-
 import { connectDB } from "./config/db.js";
 
-// routes
+// ROUTES
+import authRoutes from "./routes/authRoutes.js"; // admin
+import userAuthRoutes from "./routes/userAuthRoutes.js"; // USERS
+import warehouseRoutes from "./routes/warehouseRoutes.js";
+import categoryRoutes from "./routes/categoryRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
-// nëse i ke edhe këto, mbaji:
-// import authRoutes from "./routes/authRoutes.js";
-// import warehouseRoutes from "./routes/warehouseRoutes.js";
-// import inventoryRoutes from "./routes/inventoryRoutes.js";
-// import orderRoutes from "./routes/orderRoutes.js";
+import inventoryRoutes from "./routes/inventoryRoutes.js";
+import orderRoutes from "./routes/orderRoutes.js";
 
 dotenv.config();
 
 const app = express();
 
+// MIDDLEWARE
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
   })
 );
@@ -31,19 +32,19 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan("dev"));
 
-app.get("/api/health", (req, res) => {
-  res.json({ ok: true, message: "API is running" });
-});
+// HEALTH
+app.get("/api/health", (req, res) => res.json({ ok: true }));
 
-// mount routes
+// ===== ROUTES =====
+app.use("/api/auth", authRoutes); // ADMIN LOGIN
+app.use("/api/userauth", userAuthRoutes); // USER LOGIN / REGISTER ✅
+app.use("/api/warehouses", warehouseRoutes);
+app.use("/api/categories", categoryRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/inventory", inventoryRoutes);
+app.use("/api/orders", orderRoutes);
 
-// nëse i ke:
-// app.use("/api/auth", authRoutes);
-// app.use("/api/warehouses", warehouseRoutes);
-// app.use("/api/inventory", inventoryRoutes);
-// app.use("/api/orders", orderRoutes);
-
+// SERVER
 const PORT = process.env.PORT || 5000;
 
 connectDB()

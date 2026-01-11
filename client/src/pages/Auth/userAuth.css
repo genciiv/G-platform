@@ -1,0 +1,75 @@
+/* client/src/pages/Auth/userAuth.css */
+.ua-wrap {
+  width: min(520px, calc(100% - 32px));
+  margin: 28px auto 60px;
+}
+
+.ua-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.ua-card h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+
+.ua-card p {
+  margin: 0 0 14px;
+  color: #6b7280;
+}
+
+.ua-error {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 10px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.ua-form {
+  display: grid;
+  gap: 10px;
+}
+
+.ua-form label {
+  font-size: 13px;
+  color: #374151;
+}
+
+.ua-form input {
+  height: 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0 12px;
+  outline: none;
+}
+
+.ua-form input:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.45);
+}
+
+.ua-btn {
+  margin-top: 6px;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+}
+
+.ua-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.ua-foot {
+  margin-top: 12px;
+  color: #6b7280;
+  font-size: 14px;
+}

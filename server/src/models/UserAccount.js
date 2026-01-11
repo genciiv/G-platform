@@ -1,7 +1,7 @@
-// server/src/models/User.js
+// server/src/models/UserAccount.js
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema(
+const userAccountSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
 
@@ -11,14 +11,11 @@ const userSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true,
     },
 
     passwordHash: { type: String, required: true },
-
-    role: { type: String, enum: ["user", "admin"], default: "user" },
   },
   { timestamps: true }
 );
 
-export default mongoose.model("User", userSchema);
+export default mongoose.model("UserAccount", userAccountSchema);
