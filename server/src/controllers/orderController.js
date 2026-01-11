@@ -2,75 +2,181 @@
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import Warehouse from "../models/Warehouse.js";
+import InventoryMovement from "../models/InventoryMovement.js";
 
-// Helper për orderCode
 function makeOrderCode() {
   const d = new Date();
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  const rand = Math.floor(100000 + Math.random() * 900000); // 6 shifra
+  const rand = Math.floor(100000 + Math.random() * 900000);
   return `G-${yyyy}${mm}${dd}-${rand}`;
 }
 
-// Normalizim telefoni: pranon 069..., 355..., +355..., 00...
 function normalizePhone(v = "") {
-  let digits = String(v || "")
+  return String(v)
     .trim()
-    .replace(/\D/g, ""); // vetëm shifra
+    .replace(/\s+/g, "")
+    .replace(/[()-]/g, "")
+    .replace(/^\+/, "")
+    .replace(/^00/, "");
+}
 
-  // 00xxx -> xxx
-  if (digits.startsWith("00")) digits = digits.slice(2);
+/**
+ * Gjej magazinën DEFAULT:
+ * 1) active + code "WH-1" / "WH-01"
+ * 2) name përmban "kryes" / "main" / "default"
+ * 3) magazina e parë active (fallback)
+ */
+async function getDefaultWarehouse() {
+  const byCode = await Warehouse.findOne({
+    active: { $ne: false },
+    code: { $in: ["WH-1", "WH-01", "WH1", "WH01"] },
+  }).select("_id name code active");
 
-  // 355xxx -> xxx (Albania)
-  if (digits.startsWith("355")) digits = digits.slice(3);
+  if (byCode) return byCode;
 
-  // nëse mbetet 9 shifra dhe fillon me 6 -> shto 0 përpara (069...)
-  if (digits.length === 9 && digits.startsWith("6")) digits = "0" + digits;
+  const byName = await Warehouse.findOne({
+    active: { $ne: false },
+    name: { $regex: /(kryes|main|default)/i },
+  }).select("_id name code active");
 
-  return digits;
+  if (byName) return byName;
+
+  const first = await Warehouse.findOne({ active: { $ne: false } })
+    .sort({ createdAt: 1 })
+    .select("_id name code active");
+
+  return first;
+}
+
+async function getProductStockNumber(warehouseId, productId) {
+  const agg = await InventoryMovement.aggregate([
+    {
+      $match: {
+        warehouseId: new mongoose.Types.ObjectId(warehouseId),
+        productId: new mongoose.Types.ObjectId(productId),
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        stock: {
+          $sum: {
+            $cond: [
+              { $eq: ["$type", "IN"] },
+              "$quantity",
+              { $multiply: ["$quantity", -1] },
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  return agg?.[0]?.stock || 0;
+}
+
+/**
+ * ✅ HAPI 13: kur Order bëhet SHIPPED, bëj OUT në inventar në magazinë default
+ * - kontrollo stokun për çdo item
+ * - krijo InventoryMovement OUT për çdo item
+ * - shëno order.inventoryDeducted = true
+ */
+async function deductStockForOrderIfNeeded(order, userId = null) {
+  if (!order) throw new Error("Order missing");
+  if (order.inventoryDeducted) return { ok: true, skipped: true };
+
+  const wh = await getDefaultWarehouse();
+  if (!wh) {
+    const err = new Error(
+      "No default warehouse found. Create a warehouse first."
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const items = Array.isArray(order.items) ? order.items : [];
+  if (items.length === 0) {
+    const err = new Error("Order has no items.");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // 1) kontrollo stokun për të gjitha artikujt (para se të bësh OUT)
+  for (const it of items) {
+    const pid = it.productId?._id || it.productId;
+    const need = Number(it.qty || 0);
+    if (!mongoose.Types.ObjectId.isValid(pid) || need <= 0) continue;
+
+    // eslint-disable-next-line no-await-in-loop
+    const available = await getProductStockNumber(wh._id, pid);
+
+    if (available < need) {
+      const err = new Error(
+        `Not enough stock for "${it.title}". Need: ${need}, Available: ${available} (Warehouse: ${wh.name})`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
+  // 2) krijo OUT movements
+  for (const it of items) {
+    const pid = it.productId?._id || it.productId;
+    const need = Number(it.qty || 0);
+    if (!mongoose.Types.ObjectId.isValid(pid) || need <= 0) continue;
+
+    // eslint-disable-next-line no-await-in-loop
+    await InventoryMovement.create({
+      warehouseId: wh._id,
+      productId: pid,
+      type: "OUT",
+      quantity: need,
+      reason: "Order shipped",
+      note: `Order ${order.orderCode}`,
+      createdBy: userId || null,
+    });
+  }
+
+  // 3) shëno që stok-u u zbrit
+  order.inventoryDeducted = true;
+  await order.save();
+
+  return { ok: true, warehouse: wh };
 }
 
 /**
  * POST /api/orders
  * body:
- * {
- *   customerName, phone, address, note?,
- *   items: [{ productId, qty }]
- * }
+ * { customerName, phone, address, note?, items: [{ productId, qty }] }
  */
 export const createOrder = async (req, res) => {
   try {
     const { customerName, phone, address, note, items } = req.body;
 
-    if (!customerName || !String(customerName).trim()) {
+    if (!customerName || !String(customerName).trim())
       return res.status(400).json({ message: "customerName is required" });
-    }
-    if (!phone || !String(phone).trim()) {
-      return res.status(400).json({ message: "phone is required" });
-    }
-    if (!address || !String(address).trim()) {
-      return res.status(400).json({ message: "address is required" });
-    }
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: "items are required" });
-    }
 
-    // normalizo items
+    if (!phone || !String(phone).trim())
+      return res.status(400).json({ message: "phone is required" });
+
+    if (!address || !String(address).trim())
+      return res.status(400).json({ message: "address is required" });
+
+    if (!Array.isArray(items) || items.length === 0)
+      return res.status(400).json({ message: "items are required" });
+
     const cleanItems = items
-      .map((it) => ({
-        productId: it?.productId,
-        qty: Number(it?.qty || 0),
-      }))
+      .map((it) => ({ productId: it?.productId, qty: Number(it?.qty || 0) }))
       .filter(
         (it) => mongoose.Types.ObjectId.isValid(it.productId) && it.qty > 0
       );
 
-    if (cleanItems.length === 0) {
+    if (cleanItems.length === 0)
       return res.status(400).json({ message: "items invalid" });
-    }
 
-    // Merr produktet për cmime/tituj
     const productIds = cleanItems.map((x) => x.productId);
     const products = await Product.find({ _id: { $in: productIds } }).select(
       "title name price sku"
@@ -82,12 +188,7 @@ export const createOrder = async (req, res) => {
       const p = pMap.get(String(it.productId));
       const title = p?.title || p?.name || "Produkt";
       const price = Number(p?.price || 0);
-      return {
-        productId: it.productId,
-        title,
-        price,
-        qty: it.qty,
-      };
+      return { productId: it.productId, title, price, qty: it.qty };
     });
 
     const total = orderItems.reduce(
@@ -95,7 +196,6 @@ export const createOrder = async (req, res) => {
       0
     );
 
-    // Gjenero kod unik (me retry)
     let orderCode = makeOrderCode();
     for (let i = 0; i < 8; i++) {
       // eslint-disable-next-line no-await-in-loop
@@ -113,6 +213,10 @@ export const createOrder = async (req, res) => {
       status: "Pending",
       total,
       items: orderItems,
+      inventoryDeducted: false,
+      shippedAt: null,
+      deliveredAt: null,
+      cancelledAt: null,
     });
 
     return res.status(201).json(doc);
@@ -131,26 +235,19 @@ export const trackOrder = async (req, res) => {
     const orderCode = String(
       req.params.orderCode || req.query.code || ""
     ).trim();
-
     const phoneIn = String(req.query.phone || "").trim();
 
-    if (!orderCode) {
+    if (!orderCode)
       return res.status(400).json({ message: "Order code is required" });
-    }
-    if (!phoneIn) {
-      return res.status(400).json({ message: "Phone is required" });
-    }
+    if (!phoneIn) return res.status(400).json({ message: "Phone is required" });
 
-    // gjej porosinë vetëm me code
     const order = await Order.findOne({ orderCode })
       .populate("items.productId", "title name price sku")
       .select("-__v");
 
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
+    if (!order) return res.status(404).json({ message: "Order not found" });
 
-    // verifiko telefonin me normalizim (pranon +355 / 0...)
+    // ✅ phone compare i sigurt (formatime +355 / 0 / spaces)
     if (normalizePhone(order.phone) !== normalizePhone(phoneIn)) {
       return res.status(404).json({ message: "Order not found" });
     }
@@ -168,8 +265,8 @@ export const trackOrder = async (req, res) => {
 export const listOrders = async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
-
     const filter = {};
+
     if (q) {
       filter.$or = [
         { orderCode: new RegExp(q, "i") },
@@ -192,6 +289,8 @@ export const listOrders = async (req, res) => {
 /**
  * ADMIN: PATCH /api/orders/:id/status
  * body: { status }
+ *
+ * ✅ HAPI 13: nëse status bëhet "Shipped", zbret stokun (OUT) në magazinë default
  */
 export const updateOrderStatus = async (req, res) => {
   try {
@@ -203,19 +302,32 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(400).json({ message: "Invalid status" });
     }
 
-    const updated = await Order.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true, runValidators: true }
-    ).select("-__v");
+    const order = await Order.findById(id).select("-__v");
+    if (!order) return res.status(404).json({ message: "Order not found" });
 
-    if (!updated) {
-      return res.status(404).json({ message: "Order not found" });
+    // nëse po bëhet SHIPPED → deduktim stoku (vetëm 1 herë)
+    if (status === "Shipped" && order.status !== "Shipped") {
+      await deductStockForOrderIfNeeded(order, req.user?.id || null);
+      order.shippedAt = order.shippedAt || new Date();
     }
 
-    return res.json(updated);
+    if (status === "Delivered") {
+      order.deliveredAt = order.deliveredAt || new Date();
+    }
+
+    if (status === "Cancelled") {
+      order.cancelledAt = order.cancelledAt || new Date();
+    }
+
+    order.status = status;
+    await order.save();
+
+    return res.json(order);
   } catch (err) {
+    const code = err?.statusCode || 500;
     console.error("❌ updateOrderStatus error:", err);
-    return res.status(500).json({ message: "Failed to update status" });
+    return res
+      .status(code)
+      .json({ message: err.message || "Failed to update status" });
   }
 };

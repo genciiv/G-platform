@@ -20,13 +20,7 @@ const orderSchema = new mongoose.Schema(
     orderCode: { type: String, required: true, unique: true, index: true },
 
     customerName: { type: String, required: true, trim: true },
-
-    // ruaj si e shkruan useri
     phone: { type: String, required: true, trim: true },
-
-    // ruaj vetëm shifrat (për kërkim të sigurt)
-    phoneNormalized: { type: String, trim: true, index: true, default: "" },
-
     address: { type: String, required: true, trim: true },
     note: { type: String, trim: true, default: "" },
 
@@ -39,6 +33,14 @@ const orderSchema = new mongoose.Schema(
       enum: ["Pending", "Shipped", "Delivered", "Cancelled"],
       default: "Pending",
     },
+
+    // ✅ Hapi 13: për mos me zbrit stokun 2 herë
+    inventoryDeducted: { type: Boolean, default: false },
+
+    // optional metadata
+    shippedAt: { type: Date, default: null },
+    deliveredAt: { type: Date, default: null },
+    cancelledAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

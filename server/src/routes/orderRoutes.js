@@ -1,3 +1,4 @@
+// server/src/routes/orderRoutes.js
 import { Router } from "express";
 import {
   createOrder,
@@ -10,13 +11,12 @@ const router = Router();
 
 router.post("/", createOrder);
 
-// TRACK - prano query style
+// track me query
 router.get("/track", trackOrder);
-
-// TRACK - prano param style
+// track me param
 router.get("/track/:orderCode", trackOrder);
 
-// admin
+// admin list + update status
 router.get("/", listOrders);
 router.patch("/:id/status", updateOrderStatus);
 
