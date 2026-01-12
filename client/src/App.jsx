@@ -11,12 +11,6 @@ import Cart from "./pages/Cart/Cart.jsx";
 import Checkout from "./pages/Checkout/Checkout.jsx";
 import TrackOrder from "./pages/TrackOrder/TrackOrder.jsx";
 
-// USER
-import Login from "./pages/User/Login.jsx";
-import Register from "./pages/User/Register.jsx";
-import Account from "./pages/User/Account.jsx";
-
-// ADMIN
 import AdminLogin from "./pages/Admin/Login/AdminLogin.jsx";
 import AdminLayout from "./pages/Admin/Layout/AdminLayout.jsx";
 import AdminProducts from "./pages/Admin/Products/AdminProducts.jsx";
@@ -24,12 +18,24 @@ import AdminWarehouses from "./pages/Admin/Warehouses/AdminWarehouses.jsx";
 import AdminInventory from "./pages/Admin/Inventory/AdminInventory.jsx";
 import AdminOrders from "./pages/Admin/Orders/AdminOrders.jsx";
 
+import UserLogin from "./pages/User/Login/UserLogin.jsx";
+import UserRegister from "./pages/User/Register/UserRegister.jsx";
+import Account from "./pages/User/Account/Account.jsx";
+
 import { useAdminAuth } from "./context/adminAuth.jsx";
+import { useUserAuth } from "./context/userAuth.jsx";
 
 function AdminGuard({ children }) {
   const { isAdmin, loading } = useAdminAuth();
   if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
   if (!isAdmin) return <Navigate to="/admin/login" replace />;
+  return children;
+}
+
+function UserGuard({ children }) {
+  const { isUser, loading } = useUserAuth();
+  if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
+  if (!isUser) return <Navigate to="/login" replace />;
   return children;
 }
 
@@ -48,9 +54,16 @@ export default function App() {
         <Route path="/track" element={<TrackOrder />} />
 
         {/* USER AUTH */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/account" element={<Account />} />
+        <Route path="/login" element={<UserLogin />} />
+        <Route path="/register" element={<UserRegister />} />
+        <Route
+          path="/account"
+          element={
+            <UserGuard>
+              <Account />
+            </UserGuard>
+          }
+        />
 
         {/* ADMIN */}
         <Route path="/admin/login" element={<AdminLogin />} />
@@ -69,6 +82,7 @@ export default function App() {
           <Route path="orders" element={<AdminOrders />} />
         </Route>
 
+        {/* FALLBACK */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

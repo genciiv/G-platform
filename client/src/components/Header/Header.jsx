@@ -1,40 +1,48 @@
+// client/src/components/Header/Header.jsx
 import React, { useMemo, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import "./header.css";
 
 import { useCart } from "../../context/cartContext.jsx";
 import { useAdminAuth } from "../../context/adminAuth.jsx";
 import { useUserAuth } from "../../context/userAuth.jsx";
 
-export default function Header() {
-  const nav = useNavigate();
+import "./header.css";
 
+export default function Header() {
+  const navigate = useNavigate();
   const { items } = useCart();
-  const { isAdmin } = useAdminAuth();
-  const { user, isUser, logout: userLogout } = useUserAuth();
+
+  const { isAdmin, logout: adminLogout } = useAdminAuth();
+  const { isUser, user, logout: userLogout } = useUserAuth();
 
   const [q, setQ] = useState("");
 
   const cartCount = useMemo(() => {
-    return (items || []).reduce((s, it) => s + Number(it.qty || 1), 0);
+    if (!items || !Array.isArray(items)) return 0;
+    return items.reduce((sum, it) => sum + (Number(it.qty) || 1), 0);
   }, [items]);
 
   function onSearch(e) {
     e.preventDefault();
-    const term = q.trim();
-    if (!term) return;
-    nav(`/products?q=${encodeURIComponent(term)}`);
+    const query = q.trim();
+    if (!query) return navigate("/products");
+    navigate(`/products?q=${encodeURIComponent(query)}`);
   }
 
-  async function onLogout() {
+  async function handleAdminLogout() {
+    await adminLogout();
+    navigate("/");
+  }
+
+  async function handleUserLogout() {
     await userLogout();
-    nav("/", { replace: true });
+    navigate("/");
   }
 
   return (
     <header className="site-header">
       <div className="header-inner">
-        <Link className="brand" to="/">
+        <Link to="/" className="brand">
           G-App
         </Link>
 
@@ -51,49 +59,72 @@ export default function Header() {
         </form>
 
         <nav className="nav">
-          <NavLink className="nav-link" to="/products">
+          <NavLink
+            to="/products"
+            className={({ isActive }) =>
+              isActive ? "nav-link active" : "nav-link"
+            }
+          >
             Produkte
           </NavLink>
 
-          <NavLink className="nav-link" to="/track">
+          <NavLink
+            to="/track"
+            className={({ isActive }) =>
+              isActive ? "nav-link active" : "nav-link"
+            }
+          >
             Gjurmim
           </NavLink>
 
-          <NavLink className="nav-link" to="/cart">
-            Shporta
-            <span className="badge">{cartCount}</span>
+          <NavLink
+            to="/cart"
+            className={({ isActive }) =>
+              isActive ? "nav-link active" : "nav-link"
+            }
+          >
+            Shporta <span className="badge">{cartCount}</span>
           </NavLink>
 
           {/* USER */}
-          {isUser ? (
+          {!isUser ? (
+            <NavLink to="/login" className="nav-link admin-btn">
+              Hyr / Regjistrohu
+            </NavLink>
+          ) : (
             <>
-              <NavLink className="nav-link" to="/account">
-                {user?.name || "Account"}
+              <NavLink to="/account" className="nav-link admin-btn">
+                {user?.name ? user.name : "Account"}
               </NavLink>
-
               <button
-                type="button"
                 className="nav-link logout-btn"
-                onClick={onLogout}
+                onClick={handleUserLogout}
+                type="button"
               >
                 Dil
               </button>
             </>
-          ) : (
-            <>
-              <NavLink className="nav-link" to="/login">
-                Identifikohu
-              </NavLink>
-              <NavLink className="nav-link" to="/register">
-                Regjistrohu
-              </NavLink>
-            </>
           )}
 
-          {/* ADMIN shortcut */}
-          <NavLink className="nav-link admin-btn" to="/admin">
-            Admin
-          </NavLink>
+          {/* ADMIN (veç kur është admin) */}
+          {isAdmin ? (
+            <>
+              <NavLink to="/admin/products" className="nav-link admin-btn">
+                Admin
+              </NavLink>
+              <button
+                className="nav-link logout-btn"
+                onClick={handleAdminLogout}
+                type="button"
+              >
+                Dil Admin
+              </button>
+            </>
+          ) : (
+            <NavLink to="/admin/login" className="nav-link admin-btn">
+              Admin Login
+            </NavLink>
+          )}
         </nav>
       </div>
     </header>

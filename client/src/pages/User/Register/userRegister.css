@@ -1,0 +1,92 @@
+.ua-page {
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 60px;
+}
+
+.ua-card {
+  max-width: 520px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.06);
+}
+
+.ua-head h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.ua-head p {
+  margin: 6px 0 0;
+  color: #6b7280;
+}
+
+.ua-error {
+  margin-top: 12px;
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #991b1b;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.ua-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.ua-label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+  color: #111827;
+  font-size: 14px;
+}
+
+.ua-input {
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 12px;
+  outline: none;
+  font-weight: 600;
+}
+.ua-input:focus {
+  border-color: #9ca3af;
+}
+
+.ua-btn {
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ua-btn--primary {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+.ua-btn[disabled] {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.ua-foot {
+  margin-top: 12px;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.ua-link {
+  color: #111827;
+  font-weight: 800;
+}

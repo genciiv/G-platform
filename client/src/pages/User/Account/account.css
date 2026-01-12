@@ -1,0 +1,86 @@
+.acc-page {
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 60px;
+}
+
+.acc-card {
+  max-width: 720px;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.06);
+}
+
+.acc-head h1 {
+  margin: 0;
+  font-size: 24px;
+}
+.acc-head p {
+  margin: 8px 0 0;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.acc-kv {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 10px 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fafafa;
+}
+
+.acc-k {
+  color: #6b7280;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.acc-v {
+  color: #111827;
+  font-weight: 800;
+}
+
+.acc-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.acc-btn {
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  font-weight: 800;
+  cursor: pointer;
+  color: #111827;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.acc-btn--primary {
+  background: #111827;
+  border-color: #111827;
+  color: #fff;
+}
+
+.acc-btn--danger {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #991b1b;
+}
+
+.acc-btn[disabled] {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
