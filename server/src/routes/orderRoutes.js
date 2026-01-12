@@ -1,3 +1,4 @@
+// server/src/routes/orderRoutes.js
 import { Router } from "express";
 import {
   createOrder,
@@ -7,19 +8,19 @@ import {
   myOrders,
 } from "../controllers/orderController.js";
 
-import { userOptional, userRequired } from "../middleware/userAuth.js";
+import { optionalUser, requireUser } from "../middleware/userAuth.js";
 
 const router = Router();
 
-// ✅ kur krijon porosi, nëse je i loguar -> lidhet me userId
-router.post("/", userOptional, createOrder);
+// ✅ create order (nëse user është i loguar, ruaj userId)
+router.post("/", optionalUser, createOrder);
 
-// TRACK
+// TRACK (public)
 router.get("/track", trackOrder);
 router.get("/track/:orderCode", trackOrder);
 
-// ✅ USER: porositë e mia
-router.get("/my", userRequired, myOrders);
+// ✅ user orders (duhet login)
+router.get("/my", requireUser, myOrders);
 
 // admin
 router.get("/", listOrders);

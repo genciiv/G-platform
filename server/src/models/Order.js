@@ -1,3 +1,4 @@
+// server/src/models/Order.js
 import mongoose from "mongoose";
 
 const orderItemSchema = new mongoose.Schema(
@@ -18,8 +19,13 @@ const orderSchema = new mongoose.Schema(
   {
     orderCode: { type: String, required: true, unique: true, index: true },
 
-    // ✅ lidhje me userin (opsionale)
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "UserAccount", default: null, index: true },
+    // ✅ lidhje me user (opsionale — por kur user është i loguar, ruhet)
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "UserAccount",
+      default: null,
+      index: true,
+    },
 
     customerName: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },

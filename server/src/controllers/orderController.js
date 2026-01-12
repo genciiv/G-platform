@@ -1,3 +1,4 @@
+// server/src/controllers/orderController.js
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
@@ -8,7 +9,7 @@ function makeOrderCode() {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  const rand = Math.floor(100000 + Math.random() * 900000);
+  const rand = Math.floor(100000 + Math.random() * 900000); // 6 shifra
   return `G-${yyyy}${mm}${dd}-${rand}`;
 }
 
@@ -23,7 +24,13 @@ function normalizePhone(v = "") {
 
 /**
  * POST /api/orders
- * body: { customerName, phone, address, note?, items:[{productId, qty}] }
+ * body:
+ * {
+ *  customerName, phone, address, note?,
+ *  items: [{ productId, qty }]
+ * }
+ *
+ * ✅ nëse user është i loguar (optionalUser middleware), ruaj userId
  */
 export const createOrder = async (req, res) => {
   try {
@@ -41,8 +48,12 @@ export const createOrder = async (req, res) => {
     if (!Array.isArray(items) || items.length === 0)
       return res.status(400).json({ message: "items are required" });
 
+    // normalizo items
     const cleanItems = items
-      .map((it) => ({ productId: it?.productId, qty: Number(it?.qty || 0) }))
+      .map((it) => ({
+        productId: it?.productId,
+        qty: Number(it?.qty || 0),
+      }))
       .filter(
         (it) => mongoose.Types.ObjectId.isValid(it.productId) && it.qty > 0
       );
@@ -50,6 +61,7 @@ export const createOrder = async (req, res) => {
     if (cleanItems.length === 0)
       return res.status(400).json({ message: "items invalid" });
 
+    // Merr produktet për çmime
     const productIds = cleanItems.map((x) => x.productId);
     const products = await Product.find({ _id: { $in: productIds } }).select(
       "title name price sku"
@@ -69,7 +81,7 @@ export const createOrder = async (req, res) => {
       0
     );
 
-    // unik code
+    // Gjenero kod unik (retry i thjeshtë)
     let orderCode = makeOrderCode();
     for (let i = 0; i < 8; i++) {
       // eslint-disable-next-line no-await-in-loop
@@ -78,10 +90,10 @@ export const createOrder = async (req, res) => {
       orderCode = makeOrderCode();
     }
 
-    // ✅ lidh userin nëse është i loguar
-    const userId = req.user?.id && mongoose.Types.ObjectId.isValid(req.user.id)
-      ? req.user.id
-      : null;
+    const userId =
+      req.user?.id && mongoose.Types.ObjectId.isValid(req.user.id)
+        ? req.user.id
+        : null;
 
     const doc = await Order.create({
       orderCode,
@@ -136,6 +148,7 @@ export const trackOrder = async (req, res) => {
 
 /**
  * ✅ USER: GET /api/orders/my
+ * Kthen porositë e userit të loguar
  */
 export const myOrders = async (req, res) => {
   try {
@@ -149,7 +162,7 @@ export const myOrders = async (req, res) => {
     return res.json({ items });
   } catch (err) {
     console.error("❌ myOrders error:", err);
-    return res.status(500).json({ message: "Failed to load orders" });
+    return res.status(500).json({ message: "Failed to fetch my orders" });
   }
 };
 
@@ -169,10 +182,7 @@ export const listOrders = async (req, res) => {
       ];
     }
 
-    const items = await Order.find(filter)
-      .sort({ createdAt: -1 })
-      .select("-__v");
-
+    const items = await Order.find(filter).sort({ createdAt: -1 }).select("-__v");
     return res.json({ items });
   } catch (err) {
     console.error("❌ listOrders error:", err);
@@ -182,6 +192,7 @@ export const listOrders = async (req, res) => {
 
 /**
  * ADMIN: PATCH /api/orders/:id/status
+ * body: { status }
  */
 export const updateOrderStatus = async (req, res) => {
   try {
