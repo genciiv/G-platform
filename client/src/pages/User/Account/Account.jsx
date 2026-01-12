@@ -7,7 +7,7 @@ import { http, getErrMsg } from "../../../lib/api.js";
 
 export default function Account() {
   const nav = useNavigate();
-  const { user, isUser, loading: authLoading, logout } = useUserAuth();
+  const { user, isUser, loading: authLoading } = useUserAuth();
 
   const [orders, setOrders] = useState([]);
   const [busy, setBusy] = useState(true);
@@ -29,18 +29,13 @@ export default function Account() {
   }
 
   useEffect(() => {
-    if (!authLoading && !isUser) nav("/user/login");
+    if (!authLoading && !isUser) nav("/auth");
   }, [authLoading, isUser, nav]);
 
   useEffect(() => {
     if (!authLoading && isUser) loadMyOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isUser]);
-
-  async function onLogout() {
-    await logout();
-    nav("/");
-  }
 
   if (authLoading) return <div className="acc-wrap">Loading...</div>;
   if (!isUser) return null;
@@ -54,10 +49,6 @@ export default function Account() {
             Mirësevjen, <b>{user?.name || "User"}</b>
           </p>
         </div>
-
-        <button className="acc-btn acc-btn--ghost" onClick={onLogout}>
-          Dil
-        </button>
       </div>
 
       <div className="acc-card">

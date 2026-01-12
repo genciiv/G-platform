@@ -1,0 +1,74 @@
+/* client/src/pages/Auth/authGateway.css */
+.ag-wrap {
+  width: min(900px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 60px;
+}
+
+.ag-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+  padding: 18px;
+}
+
+.ag-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.ag-box {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  background: #fff;
+}
+
+.ag-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.ag-btn {
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  font-weight: 800;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #111827;
+}
+
+.ag-btn--primary {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+}
+
+.ag-btn:hover {
+  opacity: 0.92;
+}
+
+.ag-foot {
+  margin-top: 14px;
+}
+
+.ag-link {
+  color: #111827;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+@media (max-width: 780px) {
+  .ag-grid {
+    grid-template-columns: 1fr;
+  }
+}

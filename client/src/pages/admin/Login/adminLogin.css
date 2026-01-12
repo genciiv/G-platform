@@ -1,78 +1,78 @@
 /* client/src/pages/Admin/Login/adminLogin.css */
-.admin-login-page {
-  width: min(1100px, calc(100% - 32px));
+.al-wrap {
+  width: min(520px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 40px 0 60px;
-  display: grid;
-  place-items: center;
+  padding: 26px 0 60px;
 }
 
-.admin-login-card {
-  width: min(520px, 100%);
+.al-card {
+  border: 1px solid var(--border);
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
-  padding: 22px;
+  border-radius: 16px;
+  padding: 18px;
 }
 
-.admin-login-card h1 {
-  margin: 0 0 6px;
-  font-size: 34px;
-}
-
-.admin-login-card p {
-  margin: 0 0 14px;
-  color: #6b7280;
-}
-
-.admin-login-card form {
+.al-form {
   display: grid;
-  gap: 10px;
+  gap: 12px;
+  margin-top: 10px;
 }
 
-.admin-login-card label {
+.al-form label {
+  display: grid;
+  gap: 6px;
   font-weight: 700;
-  font-size: 13px;
   color: #111827;
-  margin-top: 6px;
 }
 
-.admin-login-card input {
-  height: 42px;
-  border: 1px solid #e5e7eb;
+.al-form input {
+  height: 44px;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0 12px;
   outline: none;
 }
 
-.admin-login-card input:focus {
+.al-form input:focus {
   border-color: #9ca3af;
 }
 
-.admin-login-card button {
+.al-btn {
   height: 44px;
-  border: 1px solid #111827;
   border-radius: 12px;
+  border: 1px solid #111827;
   background: #111827;
   color: #fff;
-  font-weight: 800;
+  font-weight: 900;
   cursor: pointer;
-  margin-top: 8px;
 }
 
-.admin-login-card button:hover {
+.al-btn:hover {
   opacity: 0.92;
 }
 
-.admin-login-error {
-  color: #b91c1c;
-  font-weight: 700;
-  margin-top: 6px;
+.al-error {
+  margin-top: 10px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 800;
 }
 
-.admin-login-hint {
+.al-foot {
   margin-top: 12px;
-  font-size: 12px;
+}
+
+.al-link {
+  font-weight: 900;
+  color: #111827;
+  text-decoration: underline;
+}
+
+.al-hint {
+  margin-top: 10px;
   color: #6b7280;
+  font-size: 13px;
 }

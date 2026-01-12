@@ -1,42 +1,42 @@
 // client/src/components/Header/Header.jsx
 import React, { useMemo, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
+import "./header.css";
 
 import { useCart } from "../../context/cartContext.jsx";
 import { useAdminAuth } from "../../context/adminAuth.jsx";
 import { useUserAuth } from "../../context/userAuth.jsx";
 
-import "./header.css";
-
 export default function Header() {
-  const navigate = useNavigate();
+  const nav = useNavigate();
   const { items } = useCart();
 
   const { isAdmin, logout: adminLogout } = useAdminAuth();
-  const { isUser, user, logout: userLogout } = useUserAuth();
+  const { user, isUser, logout: userLogout } = useUserAuth();
 
   const [q, setQ] = useState("");
 
-  const cartCount = useMemo(() => {
-    if (!items || !Array.isArray(items)) return 0;
-    return items.reduce((sum, it) => sum + (Number(it.qty) || 1), 0);
-  }, [items]);
+  const cartCount = useMemo(
+    () => (items || []).reduce((s, it) => s + Number(it?.qty || 0), 0),
+    [items]
+  );
 
   function onSearch(e) {
     e.preventDefault();
-    const query = q.trim();
-    if (!query) return navigate("/products");
-    navigate(`/products?q=${encodeURIComponent(query)}`);
+    const term = q.trim();
+    if (!term) return nav("/products");
+    nav(`/products?q=${encodeURIComponent(term)}`);
   }
 
-  async function handleAdminLogout() {
-    await adminLogout();
-    navigate("/");
-  }
-
-  async function handleUserLogout() {
-    await userLogout();
-    navigate("/");
+  async function onLogout() {
+    // nëse ke të dyja aktive, i fshin të dyja (s’ka dëm)
+    try {
+      if (isAdmin) await adminLogout();
+    } catch {}
+    try {
+      if (isUser) await userLogout();
+    } catch {}
+    nav("/");
   }
 
   return (
@@ -59,70 +59,43 @@ export default function Header() {
         </form>
 
         <nav className="nav">
-          <NavLink
-            to="/products"
-            className={({ isActive }) =>
-              isActive ? "nav-link active" : "nav-link"
-            }
-          >
+          <NavLink className="nav-link" to="/products">
             Produkte
           </NavLink>
 
-          <NavLink
-            to="/track"
-            className={({ isActive }) =>
-              isActive ? "nav-link active" : "nav-link"
-            }
-          >
+          <NavLink className="nav-link" to="/track">
             Gjurmim
           </NavLink>
 
-          <NavLink
-            to="/cart"
-            className={({ isActive }) =>
-              isActive ? "nav-link active" : "nav-link"
-            }
-          >
-            Shporta <span className="badge">{cartCount}</span>
+          <NavLink className="nav-link" to="/cart">
+            Shporta
+            <span className="badge">{cartCount}</span>
           </NavLink>
 
-          {/* USER */}
-          {!isUser ? (
-            <NavLink to="/login" className="nav-link admin-btn">
-              Hyr / Regjistrohu
-            </NavLink>
-          ) : (
+          {/* AUTH AREA */}
+          {isAdmin ? (
             <>
-              <NavLink to="/account" className="nav-link admin-btn">
-                {user?.name ? user.name : "Account"}
+              <NavLink className="nav-link admin-btn" to="/admin">
+                Admin
               </NavLink>
-              <button
-                className="nav-link logout-btn"
-                onClick={handleUserLogout}
-                type="button"
-              >
+
+              <button className="nav-link logout-btn" onClick={onLogout}>
                 Dil
               </button>
             </>
-          )}
-
-          {/* ADMIN (veç kur është admin) */}
-          {isAdmin ? (
+          ) : isUser ? (
             <>
-              <NavLink to="/admin/products" className="nav-link admin-btn">
-                Admin
+              <NavLink className="nav-link" to="/account">
+                {user?.name || "Account"}
               </NavLink>
-              <button
-                className="nav-link logout-btn"
-                onClick={handleAdminLogout}
-                type="button"
-              >
-                Dil Admin
+
+              <button className="nav-link logout-btn" onClick={onLogout}>
+                Dil
               </button>
             </>
           ) : (
-            <NavLink to="/admin/login" className="nav-link admin-btn">
-              Admin Login
+            <NavLink className="nav-link" to="/auth">
+              Hyr / Regjistrohu
             </NavLink>
           )}
         </nav>

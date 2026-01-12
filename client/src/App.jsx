@@ -1,3 +1,4 @@
+// client/src/App.jsx
 import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
@@ -11,12 +12,16 @@ import Cart from "./pages/Cart/Cart.jsx";
 import Checkout from "./pages/Checkout/Checkout.jsx";
 import TrackOrder from "./pages/TrackOrder/TrackOrder.jsx";
 
-// USER pages (paths si i ke sipas fotos)
+// AUTH GATEWAY
+import AuthGateway from "./pages/Auth/AuthGateway.jsx";
+
+// USER
 import UserLogin from "./pages/User/Login/UserLogin.jsx";
 import UserRegister from "./pages/User/Register/UserRegister.jsx";
 import Account from "./pages/User/Account/Account.jsx";
+import OrderDetails from "./pages/User/Orders/OrderDetails.jsx";
 
-// ADMIN (si i ke)
+// ADMIN
 import AdminLogin from "./pages/Admin/Login/AdminLogin.jsx";
 import AdminLayout from "./pages/Admin/Layout/AdminLayout.jsx";
 import AdminProducts from "./pages/Admin/Products/AdminProducts.jsx";
@@ -30,14 +35,14 @@ import { useUserAuth } from "./context/userAuth.jsx";
 function AdminGuard({ children }) {
   const { isAdmin, loading } = useAdminAuth();
   if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
-  if (!isAdmin) return <Navigate to="/admin/login" replace />;
+  if (!isAdmin) return <Navigate to="/auth" replace />;
   return children;
 }
 
 function UserGuard({ children }) {
   const { isUser, loading } = useUserAuth();
   if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
-  if (!isUser) return <Navigate to="/login" replace />;
+  if (!isUser) return <Navigate to="/auth" replace />;
   return children;
 }
 
@@ -55,14 +60,25 @@ export default function App() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/track" element={<TrackOrder />} />
 
-        {/* USER AUTH */}
-        <Route path="/login" element={<UserLogin />} />
-        <Route path="/register" element={<UserRegister />} />
+        {/* AUTH GATE */}
+        <Route path="/auth" element={<AuthGateway />} />
+
+        {/* USER */}
+        <Route path="/user/login" element={<UserLogin />} />
+        <Route path="/user/register" element={<UserRegister />} />
         <Route
           path="/account"
           element={
             <UserGuard>
               <Account />
+            </UserGuard>
+          }
+        />
+        <Route
+          path="/account/orders/:id"
+          element={
+            <UserGuard>
+              <OrderDetails />
             </UserGuard>
           }
         />
