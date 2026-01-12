@@ -1,5 +1,5 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   FiTruck,
   FiShield,
@@ -11,10 +11,121 @@ import {
   FiChevronRight,
   FiTag,
   FiPhoneCall,
+  FiHeart,
 } from "react-icons/fi";
+import { http } from "../../lib/api.js";
+import { useCart } from "../../context/cartContext.jsx";
 import "./home.css";
 
+function money(v) {
+  const n = Number(v || 0);
+  return new Intl.NumberFormat("sq-AL", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
+function pickImage(p) {
+  const imgs = p?.images || p?.imageUrls || p?.photos || [];
+  if (Array.isArray(imgs) && imgs.length) return imgs[0];
+  if (typeof p?.image === "string" && p.image) return p.image;
+  if (typeof p?.thumbnail === "string" && p.thumbnail) return p.thumbnail;
+  return "";
+}
+
+function isClothing(p) {
+  const t = `${p?.title || ""} ${p?.name || ""} ${p?.category || ""} ${
+    p?.description || ""
+  }`.toLowerCase();
+
+  const keys = [
+    "rrobe",
+    "rroba",
+    "bluze",
+    "t-shirt",
+    "tshirt",
+    "hoodie",
+    "xhup",
+    "xhakete",
+    "xhaketa",
+    "pantallona",
+    "triko",
+    "pulover",
+    "kapele",
+    "këmish",
+    "kemish",
+    "fustan",
+    "jeans",
+    "xhinse",
+    "sneakers",
+    "atlete",
+    "veshje",
+    "veshja",
+    "jack",
+    "jacket",
+  ];
+
+  return keys.some((k) => t.includes(k));
+}
+
 export default function Home() {
+  const nav = useNavigate();
+  const { addToCart } = useCart();
+
+  const [loadingP, setLoadingP] = useState(true);
+  const [products, setProducts] = useState([]);
+  const [pErr, setPErr] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+
+    async function load() {
+      setLoadingP(true);
+      setPErr("");
+      try {
+        const res = await http.get("/api/products");
+        const list = res.data?.items || res.data?.products || res.data || [];
+        if (!alive) return;
+        setProducts(Array.isArray(list) ? list : []);
+      } catch (e) {
+        if (!alive) return;
+        setPErr("Nuk u morën produktet.");
+        setProducts([]);
+      } finally {
+        if (!alive) return;
+        setLoadingP(false);
+      }
+    }
+
+    load();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const clothing = useMemo(() => {
+    const only = (products || []).filter(isClothing);
+    if (only.length >= 4) return only.slice(0, 8);
+    // fallback: nëse s’ka kategori rrobash, merr 8 të parat
+    return (products || []).slice(0, 8);
+  }, [products]);
+
+  function onOpenProduct(p) {
+    // nëse ke route /products/:id
+    nav(`/products/${p._id}`);
+  }
+
+  function onAdd(p) {
+    // pranon shumica e implementimeve: addToCart(product, qty)
+    try {
+      addToCart(p, 1);
+    } catch {
+      // fallback (nqs addToCart pranon vetëm 1 param)
+      addToCart(p);
+    }
+  }
+
   return (
     <main className="home">
       {/* HERO */}
@@ -112,6 +223,113 @@ export default function Home() {
               </Link>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ✅ RROBA SECTION */}
+      <section className="section">
+        <div className="section-head section-head-row">
+          <div>
+            <h2>Rroba</h2>
+            <p>
+              Zgjedhjet tona për veshje – shto shpejt në shportë ose shiko
+              detajet.
+            </p>
+          </div>
+
+          <Link to="/products" className="mini-link">
+            Shiko të gjitha <FiChevronRight />
+          </Link>
+        </div>
+
+        <div className="clothes-wrap">
+          {loadingP ? (
+            <div className="empty">
+              <div className="spinner" />
+              <div className="empty-title">Duke ngarkuar produktet...</div>
+              <div className="empty-sub">Një moment.</div>
+            </div>
+          ) : pErr ? (
+            <div className="empty">
+              <div className="empty-title">{pErr}</div>
+              <div className="empty-sub">
+                Provo rifresko faqen ose shko te “Produkte”.
+              </div>
+              <Link to="/products" className="btn btn-ghost">
+                Hap Produktet
+              </Link>
+            </div>
+          ) : clothing.length === 0 ? (
+            <div className="empty">
+              <div className="empty-title">S’ka produkte për momentin.</div>
+              <div className="empty-sub">
+                Shto produkte nga Admin dhe do shfaqen këtu.
+              </div>
+              <Link to="/products" className="btn btn-ghost">
+                Shiko Produktet
+              </Link>
+            </div>
+          ) : (
+            <div className="clothes-grid">
+              {clothing.map((p) => {
+                const img = pickImage(p);
+                const title = p?.title || p?.name || "Produkt";
+                const price = p?.price ?? p?.salePrice ?? 0;
+
+                return (
+                  <div className="p-card" key={p._id}>
+                    <button
+                      className="p-media"
+                      onClick={() => onOpenProduct(p)}
+                      type="button"
+                      aria-label="Hap produktin"
+                    >
+                      {img ? (
+                        <img src={img} alt={title} />
+                      ) : (
+                        <div className="p-placeholder">
+                          <FiShoppingBag />
+                          <span>Pa foto</span>
+                        </div>
+                      )}
+                      <span className="p-badge">
+                        <FiHeart /> Rroba
+                      </span>
+                    </button>
+
+                    <div className="p-body">
+                      <div className="p-title" title={title}>
+                        {title}
+                      </div>
+
+                      <div className="p-meta">
+                        <div className="p-price">{money(price)}</div>
+                        {p?.sku ? <div className="p-sku">SKU: {p.sku}</div> : null}
+                      </div>
+
+                      <div className="p-actions">
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => onAdd(p)}
+                        >
+                          <FiShoppingBag /> Shto
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => onOpenProduct(p)}
+                        >
+                          Detaje <FiChevronRight />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
