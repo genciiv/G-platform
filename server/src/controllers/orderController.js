@@ -148,7 +148,6 @@ export const trackOrder = async (req, res) => {
 
 /**
  * ✅ USER: GET /api/orders/my
- * Kthen porositë e userit të loguar
  */
 export const myOrders = async (req, res) => {
   try {
@@ -163,6 +162,33 @@ export const myOrders = async (req, res) => {
   } catch (err) {
     console.error("❌ myOrders error:", err);
     return res.status(500).json({ message: "Failed to fetch my orders" });
+  }
+};
+
+/**
+ * ✅ USER: GET /api/orders/my/:id
+ * vetëm porosia e userit të loguar
+ */
+export const myOrderById = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid order id" });
+    }
+
+    const order = await Order.findOne({ _id: id, userId })
+      .populate("items.productId", "title name price sku")
+      .select("-__v");
+
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    return res.json({ item: order });
+  } catch (err) {
+    console.error("❌ myOrderById error:", err);
+    return res.status(500).json({ message: "Failed to fetch order" });
   }
 };
 

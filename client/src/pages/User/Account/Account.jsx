@@ -29,7 +29,6 @@ export default function Account() {
   }
 
   useEffect(() => {
-    // nëse s’je i loguar -> te login
     if (!authLoading && !isUser) nav("/user/login");
   }, [authLoading, isUser, nav]);
 
@@ -100,7 +99,8 @@ export default function Account() {
                     <th>Status</th>
                     <th className="acc-right">Total</th>
                     <th>Data</th>
-                    <th>Gjurmim</th>
+                    <th>Track</th>
+                    <th>View</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -124,6 +124,11 @@ export default function Account() {
                           )}&phone=${encodeURIComponent(o.phone || "")}`}
                         >
                           Track
+                        </Link>
+                      </td>
+                      <td>
+                        <Link className="acc-link" to={`/account/orders/${o._id}`}>
+                          View
                         </Link>
                       </td>
                     </tr>

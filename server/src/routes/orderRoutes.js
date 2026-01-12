@@ -6,21 +6,23 @@ import {
   listOrders,
   updateOrderStatus,
   myOrders,
+  myOrderById,
 } from "../controllers/orderController.js";
 
 import { optionalUser, requireUser } from "../middleware/userAuth.js";
 
 const router = Router();
 
-// ✅ create order (nëse user është i loguar, ruaj userId)
+// create order (nëse user është i loguar, ruaj userId)
 router.post("/", optionalUser, createOrder);
 
 // TRACK (public)
 router.get("/track", trackOrder);
 router.get("/track/:orderCode", trackOrder);
 
-// ✅ user orders (duhet login)
+// user orders (duhet login)
 router.get("/my", requireUser, myOrders);
+router.get("/my/:id", requireUser, myOrderById);
 
 // admin
 router.get("/", listOrders);
