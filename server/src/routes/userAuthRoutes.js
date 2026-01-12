@@ -1,11 +1,6 @@
 // server/src/routes/userAuthRoutes.js
 import { Router } from "express";
-import {
-  registerUser,
-  loginUser,
-  meUser,
-  logoutUser,
-} from "../controllers/userAuthController.js";
+import { registerUser, loginUser, meUser, logoutUser } from "../controllers/userAuthController.js";
 
 const router = Router();
 

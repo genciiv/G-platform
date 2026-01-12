@@ -1,0 +1,29 @@
+.account-page {
+  width: min(700px, 100%);
+  margin: 40px auto;
+  padding: 0 16px;
+}
+
+.account-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+  background: #fff;
+}
+
+.account-row {
+  margin-bottom: 10px;
+  font-size: 15px;
+}
+
+.account-logout {
+  margin-top: 20px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #111827;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}

@@ -1,7 +1,15 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+// client/src/context/userAuth.jsx
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { http, getErrMsg } from "../lib/api.js";
 
 const Ctx = createContext(null);
+
+function normalizeUser(u) {
+  if (!u) return null;
+  const _id = u._id || u.id; // ✅ prano të dyja
+  if (!_id) return null;
+  return { ...u, _id };
+}
 
 export function UserAuthProvider({ children }) {
   const [user, setUser] = useState(null); // { _id, name, email }
@@ -12,10 +20,11 @@ export function UserAuthProvider({ children }) {
     setErr("");
     try {
       const res = await http.get("/api/userauth/me");
-      const u = res.data?.user || res.data?.item || res.data || null;
-      setUser(u && u._id ? u : null);
-      return u && u._id ? u : null;
-    } catch (e) {
+      const raw = res.data?.user || res.data?.item || res.data || null;
+      const u = normalizeUser(raw);
+      setUser(u);
+      return u;
+    } catch {
       setUser(null);
       return null;
     } finally {
@@ -27,8 +36,6 @@ export function UserAuthProvider({ children }) {
     setErr("");
     try {
       await http.post("/api/userauth/register", { name, email, password });
-
-      // shumë servera nuk kthejnë user në response, vetëm vendosin cookie
       await refreshMe();
       return { ok: true };
     } catch (e) {
@@ -42,8 +49,6 @@ export function UserAuthProvider({ children }) {
     setErr("");
     try {
       await http.post("/api/userauth/login", { email, password });
-
-      // rifresko user nga /me
       await refreshMe();
       return { ok: true };
     } catch (e) {
@@ -56,10 +61,9 @@ export function UserAuthProvider({ children }) {
   async function logout() {
     setErr("");
     try {
-      // nëse e ke route logout në server
       await http.post("/api/userauth/logout");
     } catch {
-      // nëse s’ke logout route, s’ka problem
+      // ok
     } finally {
       setUser(null);
     }
@@ -71,17 +75,21 @@ export function UserAuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const value = {
-    user,
-    isUser: !!user,
-    loading,
-    err,
-    setErr,
-    refreshMe,
-    register,
-    login,
-    logout,
-  };
+  const value = useMemo(
+    () => ({
+      user,
+      isUser: !!user,
+      isLoggedIn: !!user,
+      loading,
+      err,
+      setErr,
+      refreshMe,
+      register,
+      login,
+      logout,
+    }),
+    [user, loading, err]
+  );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

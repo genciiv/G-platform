@@ -11,9 +11,12 @@ import Cart from "./pages/Cart/Cart.jsx";
 import Checkout from "./pages/Checkout/Checkout.jsx";
 import TrackOrder from "./pages/TrackOrder/TrackOrder.jsx";
 
-import Register from "./pages/User/Register.jsx";
+// USER
 import Login from "./pages/User/Login.jsx";
+import Register from "./pages/User/Register.jsx";
+import Account from "./pages/User/Account.jsx";
 
+// ADMIN
 import AdminLogin from "./pages/Admin/Login/AdminLogin.jsx";
 import AdminLayout from "./pages/Admin/Layout/AdminLayout.jsx";
 import AdminProducts from "./pages/Admin/Products/AdminProducts.jsx";
@@ -45,8 +48,9 @@ export default function App() {
         <Route path="/track" element={<TrackOrder />} />
 
         {/* USER AUTH */}
-        <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/account" element={<Account />} />
 
         {/* ADMIN */}
         <Route path="/admin/login" element={<AdminLogin />} />

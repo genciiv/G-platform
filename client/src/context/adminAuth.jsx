@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+// client/src/context/adminAuth.jsx
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { http } from "../lib/api.js";
 
 const Ctx = createContext(null);
@@ -11,9 +12,11 @@ export function AdminAuthProvider({ children }) {
     try {
       await http.get("/api/auth/me");
       setIsAdmin(true);
+      return true;
     } catch (e) {
-      // 401 = thjesht jo admin, mos e trajto si error
+      // ✅ 401/403 = thjesht nuk je admin (MOS e trajto si error)
       setIsAdmin(false);
+      return false;
     } finally {
       setLoading(false);
     }
@@ -25,11 +28,16 @@ export function AdminAuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <Ctx.Provider value={{ isAdmin, loading, refreshMe }}>
-      {children}
-    </Ctx.Provider>
+  const value = useMemo(
+    () => ({
+      isAdmin,
+      loading,
+      refreshMe,
+    }),
+    [isAdmin, loading]
   );
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 export function useAdminAuth() {

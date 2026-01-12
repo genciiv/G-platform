@@ -8,14 +8,19 @@ function signToken(payload) {
   return jwt.sign(payload, secret, { expiresIn: "7d" });
 }
 
-function setAuthCookie(res, token) {
+function cookieOptions() {
   const isProd = process.env.NODE_ENV === "production";
-  res.cookie("user_token", token, {
+  return {
     httpOnly: true,
     sameSite: isProd ? "none" : "lax",
-    secure: isProd, // në prod duhet true (HTTPS)
+    secure: isProd, // localhost -> false, prod(https) -> true
     maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+    path: "/", // ✅ e rëndësishme
+  };
+}
+
+function setAuthCookie(res, token) {
+  res.cookie("user_token", token, cookieOptions());
 }
 
 function readToken(req) {
@@ -24,6 +29,14 @@ function readToken(req) {
     ? req.headers.authorization.slice(7)
     : null;
   return fromCookie || fromHeader || "";
+}
+
+function toPublicUser(userDoc) {
+  return {
+    _id: String(userDoc._id), // ✅ standard
+    name: userDoc.name,
+    email: userDoc.email,
+  };
 }
 
 export const registerUser = async (req, res) => {
@@ -50,16 +63,9 @@ export const registerUser = async (req, res) => {
     });
 
     const token = signToken({ id: String(user._id), email: user.email });
-
     setAuthCookie(res, token);
 
-    return res.status(201).json({
-      user: {
-        id: String(user._id),
-        name: user.name,
-        email: user.email,
-      },
-    });
+    return res.status(201).json({ user: toPublicUser(user) });
   } catch (err) {
     console.error("❌ registerUser error:", err);
     return res.status(500).json({ message: "Register failed" });
@@ -83,13 +89,7 @@ export const loginUser = async (req, res) => {
     const token = signToken({ id: String(user._id), email: user.email });
     setAuthCookie(res, token);
 
-    return res.json({
-      user: {
-        id: String(user._id),
-        name: user.name,
-        email: user.email,
-      },
-    });
+    return res.json({ user: toPublicUser(user) });
   } catch (err) {
     console.error("❌ loginUser error:", err);
     return res.status(500).json({ message: "Login failed" });
@@ -112,13 +112,7 @@ export const meUser = async (req, res) => {
     const user = await UserAccount.findById(decoded.id).select("name email");
     if (!user) return res.status(401).json({ message: "Unauthorized" });
 
-    return res.json({
-      user: {
-        id: String(user._id),
-        name: user.name,
-        email: user.email,
-      },
-    });
+    return res.json({ user: toPublicUser(user) });
   } catch (err) {
     console.error("❌ meUser error:", err);
     return res.status(500).json({ message: "Failed" });
@@ -126,6 +120,6 @@ export const meUser = async (req, res) => {
 };
 
 export const logoutUser = async (req, res) => {
-  res.clearCookie("user_token");
+  res.clearCookie("user_token", cookieOptions()); // ✅ duhet me të njëjtat options
   return res.json({ ok: true });
 };
