@@ -1,91 +1,352 @@
-import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import "./productDetails.css";
-import { http, getErrMsg } from "../../lib/api.js";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { http } from "../../lib/api.js";
 import { useCart } from "../../context/cartContext.jsx";
+import {
+  FiChevronLeft,
+  FiShoppingBag,
+  FiPlus,
+  FiMinus,
+  FiTag,
+  FiStar,
+} from "react-icons/fi";
+import "./productDetails.css";
+
+function money(v) {
+  const n = Number(v || 0);
+  return new Intl.NumberFormat("sq-AL", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
+function pickImages(p) {
+  const imgs = p?.images || p?.imageUrls || p?.photos || [];
+  if (Array.isArray(imgs) && imgs.length) return imgs.filter(Boolean);
+  if (typeof p?.image === "string" && p.image) return [p.image];
+  if (typeof p?.thumbnail === "string" && p.thumbnail) return [p.thumbnail];
+  return [];
+}
+
+function getTitle(p) {
+  return p?.title || p?.name || "Produkt";
+}
+
+function getPrice(p) {
+  return Number(p?.salePrice ?? p?.price ?? 0);
+}
+
+function getCategory(p) {
+  return (p?.category || p?.categoryName || "").trim();
+}
 
 export default function ProductDetails() {
   const { id } = useParams();
-  const { addToCart } = useCart();
+  const nav = useNavigate();
+  const cart = useCart();
 
-  const [item, setItem] = useState(null);
-  const [qty, setQty] = useState(1);
+  const addToCart =
+    cart?.addToCart ||
+    cart?.add ||
+    ((p) => console.warn("Missing addToCart in cartContext", p));
+
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  async function load() {
-    setErr("");
-    setLoading(true);
+  const [product, setProduct] = useState(null);
+  const [all, setAll] = useState([]);
+  const [activeImg, setActiveImg] = useState(0);
+
+  const [qty, setQty] = useState(1);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function load() {
+      setLoading(true);
+      setErr("");
+      try {
+        // 1) provo endpoint-in direkt
+        let p = null;
+        try {
+          const res1 = await http.get(`/api/products/${id}`);
+          p = res1.data?.item || res1.data?.product || res1.data || null;
+        } catch {
+          p = null;
+        }
+
+        // 2) gjithmonë merr listën për "related"
+        const res2 = await http.get("/api/products");
+        const list = res2.data?.items || res2.data?.products || res2.data || [];
+        const arr = Array.isArray(list) ? list : [];
+
+        if (!p) {
+          p = arr.find((x) => String(x?._id) === String(id)) || null;
+        }
+
+        if (!alive) return;
+        setAll(arr);
+        setProduct(p);
+        setActiveImg(0);
+      } catch (e) {
+        if (!alive) return;
+        setErr("Nuk u mor produkti.");
+        setProduct(null);
+        setAll([]);
+      } finally {
+        if (!alive) return;
+        setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  const images = useMemo(() => pickImages(product), [product]);
+
+  const related = useMemo(() => {
+    const cat = getCategory(product);
+    const base = all.filter((p) => String(p?._id) !== String(id));
+    let rel = cat ? base.filter((p) => getCategory(p) === cat) : [];
+    if (rel.length < 4) rel = [...rel, ...base].slice(0, 4);
+    return rel.slice(0, 4);
+  }, [all, product, id]);
+
+  function dec() {
+    setQty((x) => Math.max(1, x - 1));
+  }
+  function inc() {
+    setQty((x) => Math.min(99, x + 1));
+  }
+
+  function addNow() {
+    if (!product) return;
     try {
-      const res = await http.get(`/api/products/${id}`);
-      setItem(res.data?.item || res.data?.product || res.data || null);
-    } catch (e) {
-      setErr(getErrMsg(e, "S’u gjet produkti"));
-    } finally {
-      setLoading(false);
+      addToCart(product, qty);
+    } catch {
+      // fallback
+      for (let i = 0; i < qty; i++) addToCart(product);
     }
   }
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  function buyNow() {
+    addNow();
+    nav("/checkout");
+  }
 
-  if (loading) return <div style={{ padding: 24 }}>Duke ngarkuar...</div>;
-  if (err) return <div style={{ padding: 24, color: "#991b1b" }}>{err}</div>;
-  if (!item) return <div style={{ padding: 24 }}>Produkt i panjohur.</div>;
-
-  const title = item.title || item.name || "Produkt";
-  const price = Number(item.price || 0).toFixed(2);
-  const img = item.image || item.imageUrl || "";
-
-  return (
-    <div className="pd-wrap">
-      <div className="pd-top">
-        <Link to="/products" className="pd-back">
-          ← Produktet
-        </Link>
-      </div>
-
-      <div className="pd-card">
-        <div className="pd-img">
-          {img ? (
-            <img src={img} alt={title} />
-          ) : (
-            <div className="pd-ph">No Image</div>
-          )}
-        </div>
-
-        <div className="pd-body">
-          <h1>{title}</h1>
-          <div className="pd-price">{price} €</div>
-          {item.description ? (
-            <p className="pd-desc">{item.description}</p>
-          ) : null}
-
-          <div className="pd-actions">
-            <label className="pd-qty">
-              Sasia
-              <input
-                type="number"
-                min="1"
-                value={qty}
-                onChange={(e) =>
-                  setQty(Math.max(1, Number(e.target.value || 1)))
-                }
-              />
-            </label>
-
-            <button
-              className="pd-add"
-              onClick={() => addToCart(item, qty)}
-              type="button"
-            >
-              Shto në shportë
-            </button>
+  if (loading) {
+    return (
+      <main className="pd">
+        <div className="pd-inner">
+          <div className="pd-skel">
+            <div className="pd-skel-left" />
+            <div className="pd-skel-right">
+              <div />
+              <div />
+              <div />
+            </div>
           </div>
         </div>
+      </main>
+    );
+  }
+
+  if (err || !product) {
+    return (
+      <main className="pd">
+        <div className="pd-inner">
+          <div className="pd-empty">
+            <div className="pd-empty-title">S’u gjet produkti</div>
+            <div className="pd-empty-sub">
+              {err || "Ky produkt nuk ekziston."}
+            </div>
+            <Link to="/products" className="pd-btn">
+              <FiChevronLeft /> Kthehu te produktet
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const title = getTitle(product);
+  const price = getPrice(product);
+  const cat = getCategory(product);
+  const desc = product?.description || product?.desc || "";
+
+  return (
+    <main className="pd">
+      <div className="pd-inner">
+        <div className="pd-top">
+          <button className="pd-back" onClick={() => nav(-1)} type="button">
+            <FiChevronLeft /> Kthehu
+          </button>
+          <Link className="pd-toProducts" to="/products">
+            Shiko të gjitha
+          </Link>
+        </div>
+
+        <div className="pd-grid">
+          {/* LEFT: gallery */}
+          <div className="pd-left">
+            <div className="pd-main">
+              {images[activeImg] ? (
+                <img src={images[activeImg]} alt={title} />
+              ) : (
+                <div className="pd-noimg">
+                  <FiShoppingBag />
+                  <span>Pa foto</span>
+                </div>
+              )}
+              {cat ? (
+                <span className="pd-badge">
+                  <FiTag /> {cat}
+                </span>
+              ) : null}
+            </div>
+
+            {images.length > 1 ? (
+              <div className="pd-thumbs">
+                {images.map((src, i) => (
+                  <button
+                    key={src + i}
+                    className={`pd-thumb ${i === activeImg ? "active" : ""}`}
+                    onClick={() => setActiveImg(i)}
+                    type="button"
+                  >
+                    <img src={src} alt={`${title} ${i + 1}`} />
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          {/* RIGHT */}
+          <div className="pd-right">
+            <h1 className="pd-title">{title}</h1>
+
+            <div className="pd-sub">
+              <div className="pd-price">{money(price)}</div>
+              {product?.sku ? (
+                <div className="pd-sku">SKU: {product.sku}</div>
+              ) : null}
+            </div>
+
+            <div className="pd-mini">
+              <span className="pd-miniItem">
+                <FiStar /> Cilësi
+              </span>
+              <span className="pd-miniItem">
+                <FiShoppingBag /> Cash on Delivery
+              </span>
+            </div>
+
+            {desc ? <p className="pd-desc">{desc}</p> : null}
+
+            <div className="pd-qty">
+              <div className="pd-qtyLabel">Sasia</div>
+              <div className="pd-qtyCtl">
+                <button className="pd-qtyBtn" onClick={dec} type="button">
+                  <FiMinus />
+                </button>
+                <input
+                  className="pd-qtyInput"
+                  value={qty}
+                  onChange={(e) =>
+                    setQty(
+                      Math.max(
+                        1,
+                        Math.min(99, Number(e.target.value || 1) || 1)
+                      )
+                    )
+                  }
+                />
+                <button className="pd-qtyBtn" onClick={inc} type="button">
+                  <FiPlus />
+                </button>
+              </div>
+            </div>
+
+            <div className="pd-actions">
+              <button
+                className="pd-btn pd-btnDark"
+                onClick={addNow}
+                type="button"
+              >
+                <FiShoppingBag /> Shto në shportë
+              </button>
+              <button className="pd-btn" onClick={buyNow} type="button">
+                Bli tani
+              </button>
+            </div>
+
+            <div className="pd-note">
+              Pagesa: Cash on Delivery • Dorëzim në adresë • Gjurmo porosinë me
+              kod + telefon.
+            </div>
+          </div>
+        </div>
+
+        {/* RELATED */}
+        <section className="pd-rel">
+          <div className="pd-relHead">
+            <h2>Related products</h2>
+            <Link to="/products" className="pd-relLink">
+              Shiko të gjitha
+            </Link>
+          </div>
+
+          <div className="pd-relGrid">
+            {related.map((p) => {
+              const imgs = pickImages(p);
+              const img = imgs[0] || "";
+              const t = getTitle(p);
+              const pr = getPrice(p);
+
+              return (
+                <div className="pd-card" key={p._id}>
+                  <Link className="pd-cardImg" to={`/products/${p._id}`}>
+                    {img ? (
+                      <img src={img} alt={t} />
+                    ) : (
+                      <div className="pd-cardNo">
+                        <FiShoppingBag />
+                        <span>Pa foto</span>
+                      </div>
+                    )}
+                  </Link>
+
+                  <div className="pd-cardBody">
+                    <div className="pd-cardTitle" title={t}>
+                      {t}
+                    </div>
+                    <div className="pd-cardRow">
+                      <span className="pd-cardPrice">{money(pr)}</span>
+                      <button
+                        className="pd-cardBtn"
+                        type="button"
+                        onClick={() => {
+                          try {
+                            addToCart(p, 1);
+                          } catch {
+                            addToCart(p);
+                          }
+                        }}
+                      >
+                        <FiShoppingBag /> Shto
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
