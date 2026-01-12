@@ -1,10 +1,8 @@
-// server/src/controllers/orderController.js
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
-import Warehouse from "../models/Warehouse.js";
-import InventoryMovement from "../models/InventoryMovement.js";
 
+// Helper për orderCode
 function makeOrderCode() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -24,133 +22,8 @@ function normalizePhone(v = "") {
 }
 
 /**
- * Gjej magazinën DEFAULT:
- * 1) active + code "WH-1" / "WH-01"
- * 2) name përmban "kryes" / "main" / "default"
- * 3) magazina e parë active (fallback)
- */
-async function getDefaultWarehouse() {
-  const byCode = await Warehouse.findOne({
-    active: { $ne: false },
-    code: { $in: ["WH-1", "WH-01", "WH1", "WH01"] },
-  }).select("_id name code active");
-
-  if (byCode) return byCode;
-
-  const byName = await Warehouse.findOne({
-    active: { $ne: false },
-    name: { $regex: /(kryes|main|default)/i },
-  }).select("_id name code active");
-
-  if (byName) return byName;
-
-  const first = await Warehouse.findOne({ active: { $ne: false } })
-    .sort({ createdAt: 1 })
-    .select("_id name code active");
-
-  return first;
-}
-
-async function getProductStockNumber(warehouseId, productId) {
-  const agg = await InventoryMovement.aggregate([
-    {
-      $match: {
-        warehouseId: new mongoose.Types.ObjectId(warehouseId),
-        productId: new mongoose.Types.ObjectId(productId),
-      },
-    },
-    {
-      $group: {
-        _id: null,
-        stock: {
-          $sum: {
-            $cond: [
-              { $eq: ["$type", "IN"] },
-              "$quantity",
-              { $multiply: ["$quantity", -1] },
-            ],
-          },
-        },
-      },
-    },
-  ]);
-
-  return agg?.[0]?.stock || 0;
-}
-
-/**
- * ✅ HAPI 13: kur Order bëhet SHIPPED, bëj OUT në inventar në magazinë default
- * - kontrollo stokun për çdo item
- * - krijo InventoryMovement OUT për çdo item
- * - shëno order.inventoryDeducted = true
- */
-async function deductStockForOrderIfNeeded(order, userId = null) {
-  if (!order) throw new Error("Order missing");
-  if (order.inventoryDeducted) return { ok: true, skipped: true };
-
-  const wh = await getDefaultWarehouse();
-  if (!wh) {
-    const err = new Error(
-      "No default warehouse found. Create a warehouse first."
-    );
-    err.statusCode = 400;
-    throw err;
-  }
-
-  const items = Array.isArray(order.items) ? order.items : [];
-  if (items.length === 0) {
-    const err = new Error("Order has no items.");
-    err.statusCode = 400;
-    throw err;
-  }
-
-  // 1) kontrollo stokun për të gjitha artikujt (para se të bësh OUT)
-  for (const it of items) {
-    const pid = it.productId?._id || it.productId;
-    const need = Number(it.qty || 0);
-    if (!mongoose.Types.ObjectId.isValid(pid) || need <= 0) continue;
-
-    // eslint-disable-next-line no-await-in-loop
-    const available = await getProductStockNumber(wh._id, pid);
-
-    if (available < need) {
-      const err = new Error(
-        `Not enough stock for "${it.title}". Need: ${need}, Available: ${available} (Warehouse: ${wh.name})`
-      );
-      err.statusCode = 400;
-      throw err;
-    }
-  }
-
-  // 2) krijo OUT movements
-  for (const it of items) {
-    const pid = it.productId?._id || it.productId;
-    const need = Number(it.qty || 0);
-    if (!mongoose.Types.ObjectId.isValid(pid) || need <= 0) continue;
-
-    // eslint-disable-next-line no-await-in-loop
-    await InventoryMovement.create({
-      warehouseId: wh._id,
-      productId: pid,
-      type: "OUT",
-      quantity: need,
-      reason: "Order shipped",
-      note: `Order ${order.orderCode}`,
-      createdBy: userId || null,
-    });
-  }
-
-  // 3) shëno që stok-u u zbrit
-  order.inventoryDeducted = true;
-  await order.save();
-
-  return { ok: true, warehouse: wh };
-}
-
-/**
  * POST /api/orders
- * body:
- * { customerName, phone, address, note?, items: [{ productId, qty }] }
+ * body: { customerName, phone, address, note?, items:[{productId, qty}] }
  */
 export const createOrder = async (req, res) => {
   try {
@@ -196,6 +69,7 @@ export const createOrder = async (req, res) => {
       0
     );
 
+    // unik code
     let orderCode = makeOrderCode();
     for (let i = 0; i < 8; i++) {
       // eslint-disable-next-line no-await-in-loop
@@ -204,8 +78,14 @@ export const createOrder = async (req, res) => {
       orderCode = makeOrderCode();
     }
 
+    // ✅ lidh userin nëse është i loguar
+    const userId = req.user?.id && mongoose.Types.ObjectId.isValid(req.user.id)
+      ? req.user.id
+      : null;
+
     const doc = await Order.create({
       orderCode,
+      userId,
       customerName: String(customerName).trim(),
       phone: String(phone).trim(),
       address: String(address).trim(),
@@ -213,10 +93,6 @@ export const createOrder = async (req, res) => {
       status: "Pending",
       total,
       items: orderItems,
-      inventoryDeducted: false,
-      shippedAt: null,
-      deliveredAt: null,
-      cancelledAt: null,
     });
 
     return res.status(201).json(doc);
@@ -247,7 +123,6 @@ export const trackOrder = async (req, res) => {
 
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    // ✅ phone compare i sigurt (formatime +355 / 0 / spaces)
     if (normalizePhone(order.phone) !== normalizePhone(phoneIn)) {
       return res.status(404).json({ message: "Order not found" });
     }
@@ -260,7 +135,26 @@ export const trackOrder = async (req, res) => {
 };
 
 /**
- * ADMIN: GET /api/orders?q=
+ * ✅ USER: GET /api/orders/my
+ */
+export const myOrders = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const items = await Order.find({ userId })
+      .sort({ createdAt: -1 })
+      .select("-__v");
+
+    return res.json({ items });
+  } catch (err) {
+    console.error("❌ myOrders error:", err);
+    return res.status(500).json({ message: "Failed to load orders" });
+  }
+};
+
+/**
+ * ADMIN: GET /api/orders
  */
 export const listOrders = async (req, res) => {
   try {
@@ -288,9 +182,6 @@ export const listOrders = async (req, res) => {
 
 /**
  * ADMIN: PATCH /api/orders/:id/status
- * body: { status }
- *
- * ✅ HAPI 13: nëse status bëhet "Shipped", zbret stokun (OUT) në magazinë default
  */
 export const updateOrderStatus = async (req, res) => {
   try {
@@ -302,32 +193,16 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(400).json({ message: "Invalid status" });
     }
 
-    const order = await Order.findById(id).select("-__v");
-    if (!order) return res.status(404).json({ message: "Order not found" });
+    const updated = await Order.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    ).select("-__v");
 
-    // nëse po bëhet SHIPPED → deduktim stoku (vetëm 1 herë)
-    if (status === "Shipped" && order.status !== "Shipped") {
-      await deductStockForOrderIfNeeded(order, req.user?.id || null);
-      order.shippedAt = order.shippedAt || new Date();
-    }
-
-    if (status === "Delivered") {
-      order.deliveredAt = order.deliveredAt || new Date();
-    }
-
-    if (status === "Cancelled") {
-      order.cancelledAt = order.cancelledAt || new Date();
-    }
-
-    order.status = status;
-    await order.save();
-
-    return res.json(order);
+    if (!updated) return res.status(404).json({ message: "Order not found" });
+    return res.json(updated);
   } catch (err) {
-    const code = err?.statusCode || 500;
     console.error("❌ updateOrderStatus error:", err);
-    return res
-      .status(code)
-      .json({ message: err.message || "Failed to update status" });
+    return res.status(500).json({ message: "Failed to update status" });
   }
 };

@@ -11,16 +11,18 @@ import Cart from "./pages/Cart/Cart.jsx";
 import Checkout from "./pages/Checkout/Checkout.jsx";
 import TrackOrder from "./pages/TrackOrder/TrackOrder.jsx";
 
+// USER pages (paths si i ke sipas fotos)
+import UserLogin from "./pages/User/Login/UserLogin.jsx";
+import UserRegister from "./pages/User/Register/UserRegister.jsx";
+import Account from "./pages/User/Account/Account.jsx";
+
+// ADMIN (si i ke)
 import AdminLogin from "./pages/Admin/Login/AdminLogin.jsx";
 import AdminLayout from "./pages/Admin/Layout/AdminLayout.jsx";
 import AdminProducts from "./pages/Admin/Products/AdminProducts.jsx";
 import AdminWarehouses from "./pages/Admin/Warehouses/AdminWarehouses.jsx";
 import AdminInventory from "./pages/Admin/Inventory/AdminInventory.jsx";
 import AdminOrders from "./pages/Admin/Orders/AdminOrders.jsx";
-
-import UserLogin from "./pages/User/Login/UserLogin.jsx";
-import UserRegister from "./pages/User/Register/UserRegister.jsx";
-import Account from "./pages/User/Account/Account.jsx";
 
 import { useAdminAuth } from "./context/adminAuth.jsx";
 import { useUserAuth } from "./context/userAuth.jsx";
@@ -82,7 +84,6 @@ export default function App() {
           <Route path="orders" element={<AdminOrders />} />
         </Route>
 
-        {/* FALLBACK */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

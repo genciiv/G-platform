@@ -1,4 +1,3 @@
-// server/src/models/Order.js
 import mongoose from "mongoose";
 
 const orderItemSchema = new mongoose.Schema(
@@ -19,13 +18,15 @@ const orderSchema = new mongoose.Schema(
   {
     orderCode: { type: String, required: true, unique: true, index: true },
 
+    // ✅ lidhje me userin (opsionale)
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "UserAccount", default: null, index: true },
+
     customerName: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
     note: { type: String, trim: true, default: "" },
 
     items: { type: [orderItemSchema], default: [] },
-
     total: { type: Number, required: true, min: 0, default: 0 },
 
     status: {
@@ -33,14 +34,6 @@ const orderSchema = new mongoose.Schema(
       enum: ["Pending", "Shipped", "Delivered", "Cancelled"],
       default: "Pending",
     },
-
-    // ✅ Hapi 13: për mos me zbrit stokun 2 herë
-    inventoryDeducted: { type: Boolean, default: false },
-
-    // optional metadata
-    shippedAt: { type: Date, default: null },
-    deliveredAt: { type: Date, default: null },
-    cancelledAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

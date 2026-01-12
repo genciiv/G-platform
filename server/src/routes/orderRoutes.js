@@ -1,22 +1,27 @@
-// server/src/routes/orderRoutes.js
 import { Router } from "express";
 import {
   createOrder,
   trackOrder,
   listOrders,
   updateOrderStatus,
+  myOrders,
 } from "../controllers/orderController.js";
+
+import { userOptional, userRequired } from "../middleware/userAuth.js";
 
 const router = Router();
 
-router.post("/", createOrder);
+// ✅ kur krijon porosi, nëse je i loguar -> lidhet me userId
+router.post("/", userOptional, createOrder);
 
-// track me query
+// TRACK
 router.get("/track", trackOrder);
-// track me param
 router.get("/track/:orderCode", trackOrder);
 
-// admin list + update status
+// ✅ USER: porositë e mia
+router.get("/my", userRequired, myOrders);
+
+// admin
 router.get("/", listOrders);
 router.patch("/:id/status", updateOrderStatus);
 
