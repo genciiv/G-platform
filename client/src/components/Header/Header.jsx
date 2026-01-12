@@ -116,7 +116,63 @@ export default function Header() {
             <NavLink to="/admin/products" className="nav-link admin-btn">
               Admin
             </NavLink>
-          ) : null}
+          ) : null}import React from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import "./Header.css";
+import { useCart } from "../../context/cartContext.jsx";
+import { useUserAuth } from "../../context/userAuth.jsx";
+
+export default function Header() {
+  const nav = useNavigate();
+  const { items } = useCart();
+  const { isUser, user, logout } = useUserAuth();
+
+  const cartCount = (items || []).reduce((sum, it) => sum + Number(it?.qty || 1), 0);
+
+  async function onLogout() {
+    await logout();
+    nav("/", { replace: true });
+  }
+
+  return (
+    <header className="hdr">
+      <div className="hdr__inner">
+        <Link className="hdr__brand" to="/">
+          G-App
+        </Link>
+
+        <div className="hdr__search">
+          <input placeholder="Kërko produkte..." />
+          <button>Kërko</button>
+        </div>
+
+        <nav className="hdr__nav">
+          <NavLink to="/products">Produkte</NavLink>
+          <NavLink to="/track">Gjurmim</NavLink>
+          <NavLink to="/cart">Shporta {cartCount ? `(${cartCount})` : ""}</NavLink>
+
+          {!isUser ? (
+            <>
+              <NavLink to="/login">Identifikohu</NavLink>
+              <NavLink to="/register">Regjistrohu</NavLink>
+            </>
+          ) : (
+            <>
+              <span className="hdr__user">
+                {user?.name || user?.email || "User"}
+              </span>
+              <button className="hdr__btn" onClick={onLogout}>
+                Dil
+              </button>
+            </>
+          )}
+
+          <NavLink to="/admin">Admin</NavLink>
+        </nav>
+      </div>
+    </header>
+  );
+}
         </nav>
       </div>
     </header>

@@ -1,90 +1,93 @@
-// client/src/context/userAuth.jsx
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import axios from "axios";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { http, getErrMsg } from "../lib/api.js";
 
-const UserAuthContext = createContext(null);
-
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-const httpUser = axios.create({
-  baseURL: API,
-  withCredentials: true,
-});
+const Ctx = createContext(null);
 
 export function UserAuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loadingUser, setLoadingUser] = useState(true);
+  const [user, setUser] = useState(null); // { _id, name, email }
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
-  const refreshMe = async () => {
+  async function refreshMe() {
+    setErr("");
     try {
-      const res = await httpUser.get("/api/userauth/me");
-      setUser(res.data?.user || null);
-    } catch {
+      const res = await http.get("/api/userauth/me");
+      const u = res.data?.user || res.data?.item || res.data || null;
+      setUser(u && u._id ? u : null);
+      return u && u._id ? u : null;
+    } catch (e) {
       setUser(null);
+      return null;
     } finally {
-      setLoadingUser(false);
+      setLoading(false);
     }
-  };
+  }
+
+  async function register({ name, email, password }) {
+    setErr("");
+    try {
+      await http.post("/api/userauth/register", { name, email, password });
+
+      // shumë servera nuk kthejnë user në response, vetëm vendosin cookie
+      await refreshMe();
+      return { ok: true };
+    } catch (e) {
+      const msg = getErrMsg(e, "Register failed");
+      setErr(msg);
+      return { ok: false, message: msg };
+    }
+  }
+
+  async function login({ email, password }) {
+    setErr("");
+    try {
+      await http.post("/api/userauth/login", { email, password });
+
+      // rifresko user nga /me
+      await refreshMe();
+      return { ok: true };
+    } catch (e) {
+      const msg = getErrMsg(e, "Login failed");
+      setErr(msg);
+      return { ok: false, message: msg };
+    }
+  }
+
+  async function logout() {
+    setErr("");
+    try {
+      // nëse e ke route logout në server
+      await http.post("/api/userauth/logout");
+    } catch {
+      // nëse s’ke logout route, s’ka problem
+    } finally {
+      setUser(null);
+    }
+  }
 
   useEffect(() => {
+    setLoading(true);
     refreshMe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const register = async ({ name, email, password }) => {
-    const res = await httpUser.post("/api/userauth/register", {
-      name,
-      email,
-      password,
-    });
-    setUser(res.data?.user || null);
-    await refreshMe();
-    return res.data;
+  const value = {
+    user,
+    isUser: !!user,
+    loading,
+    err,
+    setErr,
+    refreshMe,
+    register,
+    login,
+    logout,
   };
 
-  const login = async ({ email, password }) => {
-    const res = await httpUser.post("/api/userauth/login", { email, password });
-    setUser(res.data?.user || null);
-    await refreshMe();
-    return res.data;
-  };
-
-  const logout = async () => {
-    try {
-      await httpUser.post("/api/userauth/logout");
-    } finally {
-      setUser(null);
-    }
-  };
-
-  const value = useMemo(
-    () => ({
-      user,
-      isUser: !!user,
-      loadingUser,
-      register,
-      login,
-      logout,
-      refreshMe,
-    }),
-    [user, loadingUser]
-  );
-
-  return (
-    <UserAuthContext.Provider value={value}>
-      {children}
-    </UserAuthContext.Provider>
-  );
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 export function useUserAuth() {
-  const ctx = useContext(UserAuthContext);
-  if (!ctx) throw new Error("useUserAuth must be used within UserAuthProvider");
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error("useUserAuth must be used inside UserAuthProvider");
   return ctx;
 }

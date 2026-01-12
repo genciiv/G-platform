@@ -1,4 +1,3 @@
-// client/src/App.jsx
 import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
@@ -12,12 +11,9 @@ import Cart from "./pages/Cart/Cart.jsx";
 import Checkout from "./pages/Checkout/Checkout.jsx";
 import TrackOrder from "./pages/TrackOrder/TrackOrder.jsx";
 
-// USER PAGES
-import UserLogin from "./pages/Auth/UserLogin.jsx";
-import UserRegister from "./pages/Auth/UserRegister.jsx";
-import Account from "./pages/Auth/Account.jsx";
+import Register from "./pages/User/Register.jsx";
+import Login from "./pages/User/Login.jsx";
 
-// ADMIN
 import AdminLogin from "./pages/Admin/Login/AdminLogin.jsx";
 import AdminLayout from "./pages/Admin/Layout/AdminLayout.jsx";
 import AdminProducts from "./pages/Admin/Products/AdminProducts.jsx";
@@ -49,9 +45,8 @@ export default function App() {
         <Route path="/track" element={<TrackOrder />} />
 
         {/* USER AUTH */}
-        <Route path="/login" element={<UserLogin />} />
-        <Route path="/register" element={<UserRegister />} />
-        <Route path="/account" element={<Account />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/login" element={<Login />} />
 
         {/* ADMIN */}
         <Route path="/admin/login" element={<AdminLogin />} />
@@ -70,7 +65,6 @@ export default function App() {
           <Route path="orders" element={<AdminOrders />} />
         </Route>
 
-        {/* FALLBACK */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

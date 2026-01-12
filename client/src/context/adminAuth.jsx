@@ -1,80 +1,39 @@
-// client/src/context/adminAuth.jsx
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { http } from "../lib/api.js";
 
-const AdminAuthContext = createContext(null);
+const Ctx = createContext(null);
 
 export function AdminAuthProvider({ children }) {
-  const [admin, setAdmin] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const refreshMe = async () => {
+  async function refreshMe() {
     try {
-      const res = await http.get("/api/auth/me");
-      const user = res.data?.user || res.data?.admin || res.data || null;
-      setAdmin(user);
-    } catch {
-      setAdmin(null);
+      await http.get("/api/auth/me");
+      setIsAdmin(true);
+    } catch (e) {
+      // 401 = thjesht jo admin, mos e trajto si error
+      setIsAdmin(false);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   useEffect(() => {
+    setLoading(true);
     refreshMe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // pranon: login({email,password}) OSE login(email,password)
-  const login = async (a, b) => {
-    const email = typeof a === "object" ? a.email : a;
-    const password = typeof a === "object" ? a.password : b;
-
-    const res = await http.post("/api/auth/login", { email, password });
-    const user = res.data?.user || res.data?.admin || null;
-    setAdmin(user);
-
-    await refreshMe();
-    return res.data;
-  };
-
-  const logout = async () => {
-    try {
-      await http.post("/api/auth/logout");
-    } catch {
-      // ignore
-    } finally {
-      setAdmin(null);
-    }
-  };
-
-  const value = useMemo(
-    () => ({
-      admin,
-      isAdmin: !!admin,
-      loading,
-      login,
-      logout,
-      refreshMe,
-    }),
-    [admin, loading]
-  );
-
   return (
-    <AdminAuthContext.Provider value={value}>
+    <Ctx.Provider value={{ isAdmin, loading, refreshMe }}>
       {children}
-    </AdminAuthContext.Provider>
+    </Ctx.Provider>
   );
 }
 
 export function useAdminAuth() {
-  const ctx = useContext(AdminAuthContext);
-  if (!ctx)
-    throw new Error("useAdminAuth must be used within AdminAuthProvider");
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error("useAdminAuth must be used inside AdminAuthProvider");
   return ctx;
 }
