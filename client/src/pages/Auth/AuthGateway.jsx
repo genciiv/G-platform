@@ -7,13 +7,23 @@ export default function AuthGateway() {
   return (
     <div className="ag-wrap">
       <div className="ag-card">
-        <h1>Hyr / Regjistrohu</h1>
-        <p>Zgjidh si do të hysh:</p>
+        <div className="ag-top">
+          <div>
+            <h1>Zgjidh mënyrën e hyrjes</h1>
+            <p>
+              Hyr si <b>përdorues</b> për të bërë porosi, ose si <b>admin</b> për
+              të menaxhuar dyqanin.
+            </p>
+          </div>
+          <div className="ag-badge">G-platform</div>
+        </div>
 
         <div className="ag-grid">
           <div className="ag-box">
-            <h3>User</h3>
-            <p>Hyr ose krijo llogari për blerje.</p>
+            <div className="ag-icon">👤</div>
+            <h2>User</h2>
+            <p>Hyr / regjistrohu dhe shiko porositë e tua.</p>
+
             <div className="ag-actions">
               <Link className="ag-btn ag-btn--primary" to="/user/login">
                 Hyr si User
@@ -25,19 +35,26 @@ export default function AuthGateway() {
           </div>
 
           <div className="ag-box">
-            <h3>Admin</h3>
-            <p>Hyr te paneli i administrimit.</p>
+            <div className="ag-icon">🛠️</div>
+            <h2>Admin</h2>
+            <p>Panel administrimi për produkte, magazina, inventar, porosi.</p>
+
             <div className="ag-actions">
-              <Link className="ag-btn ag-btn--primary" to="/admin/login">
+              <Link className="ag-btn ag-btn--dark" to="/admin/login">
                 Hyr si Admin
               </Link>
+              <div className="ag-hint">Vetëm për administratorë.</div>
             </div>
           </div>
         </div>
 
         <div className="ag-foot">
           <Link to="/" className="ag-link">
-            ← Kthehu te Home
+            ← Kthehu te Kryefaqja
+          </Link>
+          <span className="ag-dot">•</span>
+          <Link to="/products" className="ag-link">
+            Shiko produktet
           </Link>
         </div>
       </div>

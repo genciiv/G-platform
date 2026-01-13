@@ -1,92 +1,125 @@
-.ul-page {
-  width: min(1100px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 24px 0 60px;
+/* client/src/pages/User/Login/userLogin.css */
+
+.ul-wrap {
+  min-height: calc(100vh - 64px);
+  display: grid;
+  place-items: center;
+  padding: 28px 16px;
+  background:
+    radial-gradient(1000px 520px at 15% 10%, rgba(59,130,246,.14), transparent 60%),
+    radial-gradient(900px 520px at 85% 25%, rgba(245,158,11,.10), transparent 55%),
+    #f8fafc;
 }
 
 .ul-card {
-  max-width: 520px;
-  margin: 0 auto;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: #fff;
+  width: min(460px, 100%);
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(2,6,23,.10);
   padding: 18px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.06);
+  backdrop-filter: blur(10px);
 }
 
-.ul-head h1 {
-  margin: 0;
-  font-size: 24px;
+.ul-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
-.ul-head p {
-  margin: 6px 0 0;
-  color: #6b7280;
+.ul-badge {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(59,130,246,.12);
+  border: 1px solid rgba(59,130,246,.18);
+  font-weight: 900;
+  font-size: 12px;
+  color: #0f172a;
 }
 
-.ul-error {
-  margin-top: 12px;
-  border: 1px solid #fecaca;
-  background: #fff1f2;
-  color: #991b1b;
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-weight: 600;
+.ul-back {
+  font-size: 13px;
+  font-weight: 900;
+  color: #111827;
+  text-decoration: none;
+}
+
+.ul-back:hover { text-decoration: underline; }
+
+.ul-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.ul-sub {
+  margin: 0 0 14px;
+  color: #64748b;
+  font-size: 14px;
 }
 
 .ul-form {
   display: grid;
-  gap: 12px;
-  margin-top: 14px;
+  gap: 10px;
 }
 
-.ul-label {
-  display: grid;
-  gap: 6px;
-  font-weight: 700;
-  color: #111827;
-  font-size: 14px;
+.ul-form label {
+  font-size: 13px;
+  color: #334155;
+  font-weight: 800;
 }
 
-.ul-input {
+.ul-form input {
   height: 42px;
-  border: 1px solid var(--border);
   border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.12);
   padding: 0 12px;
   outline: none;
-  font-weight: 600;
+  background: #fff;
 }
-.ul-input:focus {
-  border-color: #9ca3af;
+
+.ul-form input:focus {
+  border-color: rgba(59,130,246,.6);
+  box-shadow: 0 0 0 4px rgba(59,130,246,.12);
 }
 
 .ul-btn {
   height: 44px;
   border-radius: 12px;
-  border: 1px solid var(--border);
-  background: #fff;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.ul-btn--primary {
+  border: 1px solid rgba(17,24,39,.1);
   background: #111827;
   color: #fff;
-  border-color: #111827;
+  font-weight: 900;
+  cursor: pointer;
+  margin-top: 4px;
 }
-.ul-btn[disabled] {
-  opacity: 0.65;
-  cursor: not-allowed;
+
+.ul-btn:hover { opacity: .94; }
+
+.ul-error {
+  background: rgba(239,68,68,.10);
+  border: 1px solid rgba(239,68,68,.25);
+  color: #991b1b;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 13px;
+  margin-bottom: 10px;
 }
 
 .ul-foot {
   margin-top: 12px;
-  color: #6b7280;
-  font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
+  color: #64748b;
 }
 
 .ul-link {
   color: #111827;
-  font-weight: 800;
+  font-weight: 900;
+  text-decoration: none;
 }
+
+.ul-link:hover { text-decoration: underline; }

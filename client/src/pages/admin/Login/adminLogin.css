@@ -1,78 +1,122 @@
 /* client/src/pages/Admin/Login/adminLogin.css */
-.al-wrap {
-  width: min(520px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 26px 0 60px;
-}
 
-.al-card {
-  border: 1px solid var(--border);
-  background: #fff;
-  border-radius: 16px;
-  padding: 18px;
-}
-
-.al-form {
+.admin-login-page {
+  min-height: calc(100vh - 64px);
   display: grid;
-  gap: 12px;
-  margin-top: 10px;
+  place-items: center;
+  background:
+    radial-gradient(1200px 600px at 10% 10%, rgba(59,130,246,.18), transparent 60%),
+    radial-gradient(900px 600px at 90% 20%, rgba(16,185,129,.12), transparent 55%),
+    #f8fafc;
+  padding: 28px 16px;
 }
 
-.al-form label {
-  display: grid;
-  gap: 6px;
-  font-weight: 700;
+.admin-login-card {
+  width: min(460px, 100%);
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(2,6,23,.10);
+  padding: 18px 18px 16px;
+  backdrop-filter: blur(10px);
+}
+
+.al-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.al-badge {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(17,24,39,.08);
+  border: 1px solid rgba(17,24,39,.12);
+  font-weight: 900;
+  font-size: 12px;
+  color: #0f172a;
+}
+
+.al-back {
+  font-size: 13px;
+  font-weight: 900;
   color: #111827;
+  text-decoration: none;
 }
 
-.al-form input {
-  height: 44px;
-  border: 1px solid var(--border);
+.al-back:hover { text-decoration: underline; }
+
+.admin-login-card h1 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.admin-login-card p {
+  margin: 0 0 14px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.admin-login-card form {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-login-card label {
+  font-size: 13px;
+  color: #334155;
+  font-weight: 800;
+}
+
+.admin-login-card input {
+  height: 42px;
   border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.12);
   padding: 0 12px;
   outline: none;
+  background: #fff;
 }
 
-.al-form input:focus {
-  border-color: #9ca3af;
+.admin-login-card input:focus {
+  border-color: rgba(59,130,246,.6);
+  box-shadow: 0 0 0 4px rgba(59,130,246,.12);
 }
 
-.al-btn {
+.admin-login-card button {
   height: 44px;
   border-radius: 12px;
-  border: 1px solid #111827;
+  border: 1px solid rgba(17,24,39,.1);
   background: #111827;
   color: #fff;
   font-weight: 900;
   cursor: pointer;
+  margin-top: 4px;
 }
 
-.al-btn:hover {
-  opacity: 0.92;
-}
+.admin-login-card button:hover { opacity: .94; }
 
-.al-error {
-  margin-top: 10px;
-  border: 1px solid #fecaca;
-  background: #fef2f2;
+.admin-login-error {
+  background: rgba(239,68,68,.10);
+  border: 1px solid rgba(239,68,68,.25);
   color: #991b1b;
-  border-radius: 12px;
   padding: 10px 12px;
+  border-radius: 12px;
   font-weight: 800;
-}
-
-.al-foot {
-  margin-top: 12px;
-}
-
-.al-link {
-  font-weight: 900;
-  color: #111827;
-  text-decoration: underline;
-}
-
-.al-hint {
-  margin-top: 10px;
-  color: #6b7280;
   font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.admin-login-hint {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.admin-login-hint b {
+  color: #0f172a;
 }

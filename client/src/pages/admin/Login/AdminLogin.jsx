@@ -1,83 +1,66 @@
 // client/src/pages/Admin/Login/AdminLogin.jsx
-import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { useAdminAuth } from "../../../context/adminAuth.jsx";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "./adminLogin.css";
+import { useAdminAuth } from "../../../context/adminAuth.jsx";
 
 export default function AdminLogin() {
   const nav = useNavigate();
-  const { isAdmin, login, err, setErr } = useAdminAuth();
+  const { login } = useAdminAuth();
 
   const [email, setEmail] = useState("admin@gapp.local");
-  const [password, setPassword] = useState("admin123");
+  const [password, setPassword] = useState("Admin12345!");
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [localErr, setLocalErr] = useState("");
-
-  useEffect(() => {
-    if (isAdmin) nav("/admin", { replace: true });
-  }, [isAdmin, nav]);
 
   async function onSubmit(e) {
     e.preventDefault();
-    setLocalErr("");
-    setErr("");
-
-    const e1 = email.trim().toLowerCase();
-    const p1 = password;
-
-    if (!e1) return setLocalErr("Email është i detyrueshëm.");
-    if (!p1) return setLocalErr("Password është i detyrueshëm.");
-
+    setError("");
     setBusy(true);
-    const res = await login({ email: e1, password: p1 });
-    setBusy(false);
-
-    if (res.ok) nav("/admin", { replace: true });
+    try {
+      // kujdes: te adminAuth zakonisht login pret object {email,password}
+      await login({ email, password });
+      nav("/admin");
+    } catch (err) {
+      setError(err?.response?.data?.message || "Invalid credentials");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <div className="al-wrap">
-      <div className="al-card">
+    <div className="admin-login-page">
+      <div className="admin-login-card">
+        <div className="al-head">
+          <div className="al-badge">Admin</div>
+          <Link className="al-back" to="/auth">
+            ← Auth
+          </Link>
+        </div>
+
         <h1>Admin Login</h1>
         <p>Hyr për të menaxhuar dyqanin.</p>
 
-        {(localErr || err) ? (
-          <div className="al-error">{localErr || err}</div>
-        ) : null}
+        {error ? <div className="admin-login-error">{error}</div> : null}
 
-        <form onSubmit={onSubmit} className="al-form">
-          <label>
-            Email
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-            />
-          </label>
+        <form onSubmit={onSubmit}>
+          <label>Email</label>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} />
 
-          <label>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </label>
+          <label>Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
-          <button className="al-btn" disabled={busy} type="submit">
+          <button type="submit" disabled={busy}>
             {busy ? "Duke hyrë..." : "Identifikohu"}
           </button>
         </form>
 
-        <div className="al-foot">
-          <Link to="/auth" className="al-link">
-            ← Kthehu te Hyr / Regjistrohu
-          </Link>
-        </div>
-
-        <div className="al-hint">
-          Nëse s’ke admin: hap <code>/api/auth/seed-admin</code> (vetëm lokal)
+        <div className="admin-login-hint">
+          Nëse s’ke admin: hap <b>/api/auth/seed-admin</b> (vetëm lokal)
         </div>
       </div>
     </div>
