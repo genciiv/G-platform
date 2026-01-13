@@ -107,7 +107,7 @@ export default function Header() {
 
           <NavLink to="/cart" className="nav-link">
             <FiShoppingCart />
-            Shporta
+            
             {cartCount > 0 && <span className="badge">{cartCount}</span>}
           </NavLink>
 
