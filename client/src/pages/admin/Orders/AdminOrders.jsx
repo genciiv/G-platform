@@ -1,4 +1,4 @@
-// client/src/pages/admin/Orders/AdminOrders.jsx
+// client/src/pages/Admin/Orders/AdminOrders.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "./adminOrders.css";
 import { http, getErrMsg } from "../../../lib/api.js";
@@ -8,16 +8,16 @@ const STATUSES = ["Pending", "Shipped", "Delivered", "Cancelled"];
 export default function AdminOrders() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState(null);
   const [err, setErr] = useState("");
-  const [q, setQ] = useState(""); // search by code/phone/name
+
+  const [q, setQ] = useState("");
 
   async function load() {
     setErr("");
     setLoading(true);
     try {
-      const res = await http.get("/api/orders");
-      const list = res.data?.items || res.data?.orders || res.data || [];
+      const res = await http.get(`/api/orders${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      const list = res.data?.items || res.data || [];
       setItems(Array.isArray(list) ? list : []);
     } catch (e) {
       setErr(getErrMsg(e, "S’u arrit të merren porositë"));
@@ -28,78 +28,66 @@ export default function AdminOrders() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    if (!t) return items;
+  const stats = useMemo(() => {
+    const total = items.length;
+    const pending = items.filter((x) => String(x.status || "").toLowerCase() === "pending").length;
+    return { total, pending };
+  }, [items]);
 
-    return items.filter((o) => {
-      const code = (o.orderCode || "").toLowerCase();
-      const name = (o.customerName || "").toLowerCase();
-      const phone = (o.phone || "").toLowerCase();
-      return code.includes(t) || name.includes(t) || phone.includes(t);
-    });
-  }, [items, q]);
-
-  const totalOrders = filtered.length;
-
-  const sumRevenue = useMemo(() => {
-    return filtered.reduce((sum, o) => sum + Number(o.total || 0), 0);
-  }, [filtered]);
-
-  async function changeStatus(orderId, status) {
+  async function setStatus(orderId, status) {
     setErr("");
-    setBusyId(orderId);
     try {
       await http.patch(`/api/orders/${orderId}/status`, { status });
-      // refresh list
       await load();
     } catch (e) {
-      setErr(getErrMsg(e, "Nuk u ndryshua statusi"));
-    } finally {
-      setBusyId(null);
+      setErr(getErrMsg(e, "Nuk u përditësua statusi"));
     }
   }
 
-  function fmtDate(iso) {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString();
-    } catch {
-      return iso || "-";
-    }
+  async function doSearch(e) {
+    e.preventDefault();
+    await load();
   }
 
   return (
     <div className="ao-wrap">
       <div className="ao-head">
         <div>
-          <h2>Porositë</h2>
-          <p>Shiko porositë dhe ndrysho statusin.</p>
+          <h2>Porosi</h2>
+          <p>Shiko dhe përditëso statusin e porosive.</p>
         </div>
 
-        <div className="ao-actions">
-          <input
-            className="ao-search"
-            placeholder="Kërko (kod / emër / telefon)..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <button className="ao-btn" onClick={load} disabled={loading}>
-            Rifresko
-          </button>
+        <div className="ao-headRight">
+          <form className="ao-search" onSubmit={doSearch}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Kërko: kod, emër, telefon..."
+            />
+            <button className="ao-btn" type="submit" disabled={loading}>
+              Kërko
+            </button>
+          </form>
+
+          <div className="ao-actions">
+            <button className="ao-btn" onClick={load} disabled={loading}>
+              Rifresko
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="ao-stats">
         <div className="ao-stat">
-          <div className="ao-stat__label">Nr. porosish</div>
-          <div className="ao-stat__value">{totalOrders}</div>
+          <div className="ao-stat__label">Gjithsej</div>
+          <div className="ao-stat__value">{stats.total}</div>
         </div>
         <div className="ao-stat">
-          <div className="ao-stat__label">Totali (€)</div>
-          <div className="ao-stat__value">{sumRevenue.toFixed(2)}</div>
+          <div className="ao-stat__label">Pending</div>
+          <div className="ao-stat__value">{stats.pending}</div>
         </div>
       </div>
 
@@ -108,78 +96,53 @@ export default function AdminOrders() {
       <div className="ao-card">
         {loading ? (
           <div className="ao-empty">Duke ngarkuar...</div>
-        ) : filtered.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="ao-empty">S’ka porosi.</div>
         ) : (
-          <div className="ao-table-wrap">
+          <div className="ao-tableWrap">
             <table className="ao-table">
               <thead>
                 <tr>
                   <th>Kodi</th>
                   <th>Klienti</th>
-                  <th>Totali</th>
+                  <th className="ao-right">Total</th>
                   <th>Status</th>
                   <th>Data</th>
-                  <th className="ao-col-actions">Veprime</th>
+                  <th className="ao-col-actions">Ndrysho</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((o) => {
-                  const id = o._id || o.id;
-                  const code = o.orderCode || "-";
-                  const name = o.customerName || "-";
-                  const phone = o.phone || "-";
-                  const total = Number(o.total || 0).toFixed(2);
-                  const status = o.status || "Pending";
-                  const when = fmtDate(o.createdAt);
-
-                  return (
-                    <tr key={id}>
-                      <td>
-                        <div className="ao-code">{code}</div>
-                        <div className="ao-sub">
-                          Items: {o.items?.length || 0}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="ao-name">{name}</div>
-                        <div className="ao-sub">{phone}</div>
-                        {o.address ? (
-                          <div className="ao-sub">{o.address}</div>
-                        ) : null}
-                      </td>
-                      <td className="ao-money">{total} €</td>
-                      <td>
-                        <span className={"ao-pill " + pillClass(status)}>
-                          {status}
-                        </span>
-                      </td>
-                      <td className="ao-sub">{when}</td>
-                      <td className="ao-actions-cell">
-                        <select
-                          className="ao-select"
-                          value={status}
-                          disabled={busyId === id}
-                          onChange={(e) => changeStatus(id, e.target.value)}
-                        >
-                          {STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-
-                        <button
-                          className="ao-btn ao-btn--ghost"
-                          type="button"
-                          onClick={() => alert(renderOrderDetails(o))}
-                        >
-                          Detaje
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {items.map((o) => (
+                  <tr key={o._id}>
+                    <td className="ao-strong">{o.orderCode || o.code || "-"}</td>
+                    <td>
+                      <div className="ao-strong">{o.customerName || "-"}</div>
+                      <div className="ao-sub">
+                        {o.phone || "-"} • {o.address || "-"}
+                      </div>
+                    </td>
+                    <td className="ao-right ao-strong">
+                      {Number(o.total || 0).toFixed(2)} €
+                    </td>
+                    <td>
+                      <span className={"ao-pill " + pillClass(o.status)}>
+                        {o.status || "Pending"}
+                      </span>
+                    </td>
+                    <td className="ao-sub">{fmt(o.createdAt)}</td>
+                    <td className="ao-actionsCell">
+                      <select
+                        className="ao-select"
+                        value={o.status || "Pending"}
+                        onChange={(e) => setStatus(o._id, e.target.value)}
+                      >
+                        {STATUSES.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -189,30 +152,18 @@ export default function AdminOrders() {
   );
 }
 
-function pillClass(status) {
-  if (status === "Delivered") return "is-green";
-  if (status === "Shipped") return "is-blue";
-  if (status === "Cancelled") return "is-red";
-  return "is-gray"; // Pending
+function fmt(iso) {
+  try {
+    return iso ? new Date(iso).toLocaleString() : "-";
+  } catch {
+    return iso || "-";
+  }
 }
 
-function renderOrderDetails(o) {
-  const lines = [];
-  lines.push(`Kodi: ${o.orderCode}`);
-  lines.push(`Status: ${o.status}`);
-  lines.push(`Klienti: ${o.customerName}`);
-  lines.push(`Tel: ${o.phone}`);
-  lines.push(`Adresa: ${o.address}`);
-  if (o.note) lines.push(`Shenim: ${o.note}`);
-  lines.push(`--- Artikuj ---`);
-  (o.items || []).forEach((it) => {
-    lines.push(
-      `${it.qty} x ${it.title}  (${Number(it.price || 0).toFixed(2)}€) = ${(
-        Number(it.price || 0) * Number(it.qty || 1)
-      ).toFixed(2)}€`
-    );
-  });
-  lines.push(`---`);
-  lines.push(`Total: ${Number(o.total || 0).toFixed(2)}€`);
-  return lines.join("\n");
+function pillClass(status = "") {
+  const s = String(status).toLowerCase();
+  if (s.includes("deliver")) return "is-green";
+  if (s.includes("ship")) return "is-blue";
+  if (s.includes("cancel")) return "is-red";
+  return "is-gray";
 }

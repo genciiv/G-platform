@@ -1,48 +1,33 @@
-// client/src/pages/admin/Products/AdminProducts.jsx
+// client/src/pages/Admin/Products/AdminProducts.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "./adminProducts.css";
 import { http, getErrMsg } from "../../../lib/api.js";
 
-const emptyForm = {
-  title: "",
-  price: "",
-  sku: "",
-  description: "",
-  image: "",
-  active: true,
-};
-
 export default function AdminProducts() {
-  const [rows, setRows] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   const [q, setQ] = useState("");
 
-  // modal state
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState("create"); // create | edit
-  const [currentId, setCurrentId] = useState(null);
-  const [form, setForm] = useState(emptyForm);
+  const [editing, setEditing] = useState(null);
 
-  const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    if (!t) return rows;
-    return rows.filter((p) => {
-      const a = (p.title || p.name || "").toLowerCase();
-      const b = (p.sku || "").toLowerCase();
-      return a.includes(t) || b.includes(t);
-    });
-  }, [rows, q]);
+  // form
+  const [title, setTitle] = useState("");
+  const [sku, setSku] = useState("");
+  const [price, setPrice] = useState("");
+  const [active, setActive] = useState(true);
+  const [image, setImage] = useState("");
+  const [desc, setDesc] = useState("");
 
   async function load() {
     setErr("");
     setLoading(true);
     try {
-      const res = await http.get("/api/products");
-      const list = res.data?.items || res.data?.products || res.data || [];
-      setRows(Array.isArray(list) ? list : []);
+      const res = await http.get(`/api/products${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      const list = res.data?.items || res.data || [];
+      setItems(Array.isArray(list) ? list : []);
     } catch (e) {
       setErr(getErrMsg(e, "S’u arrit të merren produktet"));
     } finally {
@@ -52,89 +37,91 @@ export default function AdminProducts() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const stats = useMemo(() => {
+    const total = items.length;
+    const activeCount = items.filter((x) => (x.active ?? true) === true).length;
+    return { total, activeCount };
+  }, [items]);
+
+  function resetForm() {
+    setTitle("");
+    setSku("");
+    setPrice("");
+    setActive(true);
+    setImage("");
+    setDesc("");
+    setEditing(null);
+  }
+
   function openCreate() {
-    setMode("create");
-    setCurrentId(null);
-    setForm(emptyForm);
+    resetForm();
     setOpen(true);
   }
 
   function openEdit(p) {
-    setMode("edit");
-    setCurrentId(p._id || p.id);
-    setForm({
-      title: p.title || p.name || "",
-      price: p.price ?? "",
-      sku: p.sku || "",
-      description: p.description || "",
-      image: p.image || p.imageUrl || "",
-      active: p.active ?? true,
-    });
+    setEditing(p);
+    setTitle(p.title || p.name || "");
+    setSku(p.sku || "");
+    setPrice(String(p.price ?? ""));
+    setActive(p.active ?? true);
+
+    // prano disa forma images: image, thumbnail, images[0]
+    const img =
+      p.image ||
+      p.thumbnail ||
+      (Array.isArray(p.images) ? p.images[0] : "") ||
+      "";
+    setImage(img || "");
+    setDesc(p.description || p.desc || "");
     setOpen(true);
   }
 
-  function closeModal() {
-    setOpen(false);
-    setErr("");
-  }
-
-  function onChange(e) {
-    const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  }
-
-  async function submit(e) {
+  async function save(e) {
     e.preventDefault();
     setErr("");
 
     const payload = {
-      title: form.title.trim(),
-      // serverët shpesh duan number
-      price: form.price === "" ? 0 : Number(form.price),
-      sku: form.sku.trim(),
-      description: form.description.trim(),
-      image: form.image.trim(),
-      active: !!form.active,
+      title: title.trim(),
+      sku: sku.trim(),
+      price: Number(price || 0),
+      active: !!active,
+      description: desc.trim(),
     };
 
-    if (!payload.title) return setErr("Titulli është i detyrueshëm");
+    // nqs serveri yt ruan images si array:
+    if (image.trim()) payload.images = [image.trim()];
 
-    setBusy(true);
     try {
-      if (mode === "create") {
-        await http.post("/api/products", payload);
+      if (editing?._id) {
+        await http.put(`/api/products/${editing._id}`, payload);
       } else {
-        await http.put(`/api/products/${currentId}`, payload);
+        await http.post("/api/products", payload);
       }
-      await load();
       setOpen(false);
+      resetForm();
+      await load();
     } catch (e2) {
       setErr(getErrMsg(e2, "Nuk u ruajt produkti"));
-    } finally {
-      setBusy(false);
     }
   }
 
-  async function onDelete(p) {
-    const id = p._id || p.id;
-    const name = p.title || p.name || "produkt";
-    if (!confirm(`Ta fshij “${name}”?`)) return;
-
-    setBusy(true);
+  async function remove(id) {
+    if (!confirm("Ta fshij këtë produkt?")) return;
     setErr("");
     try {
       await http.delete(`/api/products/${id}`);
       await load();
     } catch (e) {
       setErr(getErrMsg(e, "Nuk u fshi produkti"));
-    } finally {
-      setBusy(false);
     }
+  }
+
+  async function doSearch(e) {
+    e.preventDefault();
+    await load();
   }
 
   return (
@@ -142,19 +129,40 @@ export default function AdminProducts() {
       <div className="ap-head">
         <div>
           <h2>Produkte</h2>
-          <p>Këtu bëjmë CRUD të produkteve (add/edit/delete).</p>
+          <p>Menaxho produktet (shto / edit / fshi).</p>
         </div>
 
-        <div className="ap-actions">
-          <input
-            className="ap-search"
-            placeholder="Kërko (titull / SKU)..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <button className="ap-btn ap-btn--primary" onClick={openCreate}>
-            + Shto produkt
-          </button>
+        <div className="ap-headRight">
+          <form className="ap-search" onSubmit={doSearch}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Kërko: kod, emër, SKU..."
+            />
+            <button className="ap-btn" type="submit" disabled={loading}>
+              Kërko
+            </button>
+          </form>
+
+          <div className="ap-actions">
+            <button className="ap-btn ap-btn--primary" onClick={openCreate}>
+              + Shto produkt
+            </button>
+            <button className="ap-btn" onClick={load} disabled={loading}>
+              Rifresko
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="ap-stats">
+        <div className="ap-stat">
+          <div className="ap-stat__label">Gjithsej</div>
+          <div className="ap-stat__value">{stats.total}</div>
+        </div>
+        <div className="ap-stat">
+          <div className="ap-stat__label">Aktive</div>
+          <div className="ap-stat__value">{stats.activeCount}</div>
         </div>
       </div>
 
@@ -163,141 +171,119 @@ export default function AdminProducts() {
       <div className="ap-card">
         {loading ? (
           <div className="ap-empty">Duke ngarkuar...</div>
-        ) : filtered.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="ap-empty">S’ka produkte.</div>
         ) : (
-          <table className="ap-table">
-            <thead>
-              <tr>
-                <th>Produkt</th>
-                <th>SKU</th>
-                <th>Çmimi</th>
-                <th>Status</th>
-                <th className="ap-col-actions">Veprime</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((p) => {
-                const id = p._id || p.id;
-                const title = p.title || p.name || "(pa emër)";
-                const price = Number(p.price || 0).toFixed(2);
-                const sku = p.sku || "-";
-                const active = p.active ?? true;
-
-                return (
-                  <tr key={id}>
-                    <td className="ap-prod">
-                      <div className="ap-prod__title">{title}</div>
-                      {p.description ? (
-                        <div className="ap-prod__desc">{p.description}</div>
-                      ) : null}
-                    </td>
-                    <td>{sku}</td>
-                    <td>{price} €</td>
+          <div className="ap-tableWrap">
+            <table className="ap-table">
+              <thead>
+                <tr>
+                  <th>Produkt</th>
+                  <th>SKU</th>
+                  <th className="ap-right">Çmimi</th>
+                  <th>Status</th>
+                  <th className="ap-col-actions">Veprime</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((p) => (
+                  <tr key={p._id}>
                     <td>
-                      <span
-                        className={"ap-pill " + (active ? "is-on" : "is-off")}
-                      >
-                        {active ? "Aktiv" : "Jo aktiv"}
+                      <div className="ap-prod">
+                        <div className="ap-thumb">
+                          {getImg(p) ? (
+                            <img src={getImg(p)} alt="" />
+                          ) : (
+                            <span>🧥</span>
+                          )}
+                        </div>
+                        <div>
+                          <div className="ap-strong">{p.title || p.name || "Produkt"}</div>
+                          <div className="ap-sub">
+                            {p.description || p.desc || "—"}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="ap-sub">{p.sku || "—"}</td>
+                    <td className="ap-right ap-strong">
+                      {Number(p.price || 0).toFixed(2)} €
+                    </td>
+                    <td>
+                      <span className={"ap-pill " + ((p.active ?? true) ? "is-green" : "is-gray")}>
+                        {(p.active ?? true) ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td className="ap-actions-cell">
-                      <button
-                        className="ap-btn ap-btn--ghost"
-                        onClick={() => openEdit(p)}
-                      >
+                    <td className="ap-actionsCell">
+                      <button className="ap-btn" onClick={() => openEdit(p)}>
                         Edit
                       </button>
-                      <button
-                        className="ap-btn ap-btn--danger"
-                        onClick={() => onDelete(p)}
-                        disabled={busy}
-                      >
+                      <button className="ap-btn ap-btn--danger" onClick={() => remove(p._id)}>
                         Fshi
                       </button>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      {/* MODAL */}
       {open ? (
-        <div className="ap-modal-backdrop" onClick={closeModal}>
-          <div className="ap-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ap-modal__head">
-              <h3>{mode === "create" ? "Shto produkt" : "Edit produkt"}</h3>
-              <button className="ap-x" onClick={closeModal} type="button">
-                ✕
-              </button>
+        <div className="ap-modalOverlay" onMouseDown={() => setOpen(false)}>
+          <div className="ap-modal" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="ap-modalHead">
+              <div className="ap-modalTitle">{editing ? "Edit produkt" : "Shto produkt"}</div>
+              <button className="ap-x" onClick={() => setOpen(false)}>✕</button>
             </div>
 
-            <form className="ap-form" onSubmit={submit}>
-              <div className="ap-grid">
-                <div className="ap-field">
-                  <label>Titulli *</label>
-                  <input name="title" value={form.title} onChange={onChange} />
-                </div>
-
-                <div className="ap-field">
-                  <label>Çmimi (€)</label>
-                  <input
-                    name="price"
-                    type="number"
-                    step="0.01"
-                    value={form.price}
-                    onChange={onChange}
-                  />
-                </div>
-
-                <div className="ap-field">
-                  <label>SKU</label>
-                  <input name="sku" value={form.sku} onChange={onChange} />
-                </div>
-
-                <div className="ap-field">
-                  <label>Image URL</label>
-                  <input name="image" value={form.image} onChange={onChange} />
-                </div>
-
-                <div className="ap-field ap-field--full">
-                  <label>Përshkrimi</label>
-                  <textarea
-                    name="description"
-                    rows={4}
-                    value={form.description}
-                    onChange={onChange}
-                  />
-                </div>
-
-                <div className="ap-field ap-check">
-                  <label className="ap-check__row">
-                    <input
-                      name="active"
-                      type="checkbox"
-                      checked={!!form.active}
-                      onChange={onChange}
-                    />
-                    Aktiv
-                  </label>
-                </div>
+            <form className="ap-form" onSubmit={save}>
+              <div className="ap-row2">
+                <label>
+                  Emri / Titulli *
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+                </label>
+                <label>
+                  SKU
+                  <input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="p.sh. SKU-001" />
+                </label>
               </div>
 
-              {err ? <div className="ap-error">{err}</div> : null}
+              <div className="ap-row2">
+                <label>
+                  Çmimi (€) *
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    required
+                  />
+                </label>
+                <label className="ap-check">
+                  Aktiv
+                  <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+                </label>
+              </div>
 
-              <div className="ap-modal__foot">
-                <button className="ap-btn" type="button" onClick={closeModal}>
-                  Anulo
+              <label>
+                Foto (URL)
+                <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://..." />
+              </label>
+
+              <label>
+                Përshkrim
+                <textarea rows={4} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Shkruaj përshkrimin..." />
+              </label>
+
+              <div className="ap-formActions">
+                <button className="ap-btn ap-btn--primary" type="submit">
+                  Ruaj
                 </button>
-                <button
-                  className="ap-btn ap-btn--primary"
-                  disabled={busy}
-                  type="submit"
-                >
-                  {busy ? "Duke ruajtur..." : "Ruaj"}
+                <button className="ap-btn" type="button" onClick={() => { setOpen(false); resetForm(); }}>
+                  Anulo
                 </button>
               </div>
             </form>
@@ -306,4 +292,12 @@ export default function AdminProducts() {
       ) : null}
     </div>
   );
+}
+
+function getImg(p) {
+  if (!p) return "";
+  if (p.image) return p.image;
+  if (p.thumbnail) return p.thumbnail;
+  if (Array.isArray(p.images) && p.images[0]) return p.images[0];
+  return "";
 }

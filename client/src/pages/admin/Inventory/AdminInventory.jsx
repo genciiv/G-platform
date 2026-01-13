@@ -1,3 +1,4 @@
+// client/src/pages/Admin/Inventory/AdminInventory.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "./adminInventory.css";
 import { http, getErrMsg } from "../../../lib/api.js";
@@ -30,29 +31,17 @@ export default function AdminInventory() {
         http.get("/api/products"),
       ]);
 
-      // ✅ prano te dy formatet: array ose {items:[]}
-      const wData = wRes.data;
-      const pData = pRes.data;
+      const wItems = wRes.data?.items || wRes.data || [];
+      const pItems = pRes.data?.items || pRes.data || [];
 
-      const wItems = Array.isArray(wData) ? wData : wData?.items || [];
-      const pItems = Array.isArray(pData) ? pData : pData?.items || [];
+      const w = Array.isArray(wItems) ? wItems : [];
+      const p = Array.isArray(pItems) ? pItems : [];
 
-      const safeWarehouses = Array.isArray(wItems) ? wItems : [];
-      const safeProducts = Array.isArray(pItems) ? pItems : [];
+      setWarehouses(w);
+      setProducts(p.filter((x) => (x.active ?? true) === true));
 
-      setWarehouses(safeWarehouses);
-
-      const activeProducts = safeProducts.filter((x) => (x.active ?? true) === true);
-      setProducts(activeProducts);
-
-      // ✅ zgjidh automatikisht magazinen e pare nese s’ka te zgjedhur
-      const firstWhId = safeWarehouses?.[0]?._id || "";
-      setWarehouseId((prev) => prev || firstWhId);
-
-      // ✅ zgjidh edhe produktin e pare per lehtësi (opsionale)
-      const firstProdId = activeProducts?.[0]?._id || "";
-      setProductId((prev) => prev || firstProdId);
-
+      const first = w?.[0]?._id || "";
+      setWarehouseId(first);
     } catch (e) {
       setErr(getErrMsg(e, "Bootstrap failed"));
     } finally {
@@ -66,7 +55,6 @@ export default function AdminInventory() {
       setMovements([]);
       return;
     }
-
     setErr("");
     try {
       const [sRes, mRes] = await Promise.all([
@@ -74,15 +62,8 @@ export default function AdminInventory() {
         http.get(`/api/inventory/movements?warehouseId=${encodeURIComponent(whId)}`),
       ]);
 
-      // ✅ prano array ose {items:[]}
-      const sData = sRes.data;
-      const mData = mRes.data;
-
-      const sItems = Array.isArray(sData) ? sData : sData?.items || [];
-      const mItems = Array.isArray(mData) ? mData : mData?.items || [];
-
-      setStock(Array.isArray(sItems) ? sItems : []);
-      setMovements(Array.isArray(mItems) ? mItems : []);
+      setStock(Array.isArray(sRes.data?.items) ? sRes.data.items : []);
+      setMovements(Array.isArray(mRes.data?.items) ? mRes.data.items : []);
     } catch (e) {
       setErr(getErrMsg(e, "S’u arrit të merren të dhënat e inventarit"));
     }
@@ -103,7 +84,7 @@ export default function AdminInventory() {
   }, [warehouses, warehouseId]);
 
   const stockTotalQty = useMemo(
-    () => stock.reduce((s, x) => s + Number(x.qty || x.quantity || x.stock || 0), 0),
+    () => stock.reduce((s, x) => s + Number(x.qty || 0), 0),
     [stock]
   );
 
@@ -117,12 +98,11 @@ export default function AdminInventory() {
 
     setBusy(true);
     try {
-      // ✅ serveri yt (nga kodi qe solle) pret "quantity", jo "qty"
       await http.post("/api/inventory/move", {
         warehouseId,
         productId,
         type,
-        quantity: Number(qty),
+        qty: Number(qty),
         reason,
         note,
       });
@@ -190,17 +170,12 @@ export default function AdminInventory() {
       </div>
 
       <div className="ai-grid">
-        {/* MOVE FORM */}
         <div className="ai-card">
           <h3>Lëvizje stoku</h3>
 
           <form className="ai-form" onSubmit={submitMove}>
             <label>Produkt *</label>
-            <select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              required
-            >
+            <select value={productId} onChange={(e) => setProductId(e.target.value)} required>
               <option value="">-- zgjidh produkt --</option>
               {products.map((p) => (
                 <option key={p._id} value={p._id}>
@@ -221,28 +196,15 @@ export default function AdminInventory() {
 
               <label>
                 Sasia
-                <input
-                  type="number"
-                  min="1"
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                />
+                <input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} />
               </label>
             </div>
 
             <label>Arsye</label>
-            <input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder='p.sh. "Blerje", "Shitje", "Kthim"'
-            />
+            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder='p.sh. "Blerje", "Shitje", "Kthim"' />
 
             <label>Shënim</label>
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="opsionale"
-            />
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="opsionale" />
 
             <button className="ai-btn ai-btn--primary" disabled={busy} type="submit">
               {busy ? "Duke ruajtur..." : "Ruaj lëvizjen"}
@@ -250,12 +212,10 @@ export default function AdminInventory() {
           </form>
 
           <div className="ai-hint">
-            ⚠️ Nëse bën OUT dhe nuk ka stok mjaftueshëm, serveri kthen:{" "}
-            <b>Not enough stock</b>.
+            ⚠️ Nëse bën OUT dhe nuk ka stok mjaftueshëm, serveri kthen: <b>Not enough stock</b>.
           </div>
         </div>
 
-        {/* STOCK TABLE */}
         <div className="ai-card">
           <h3>Gjendja e stokut</h3>
 
@@ -278,9 +238,9 @@ export default function AdminInventory() {
                 <tbody>
                   {stock.map((s) => (
                     <tr key={s._id}>
-                      <td className="ai-strong">{s.productId?.title || s.product?.title || "-"}</td>
-                      <td className="ai-sub">{s.productId?.sku || s.product?.sku || "-"}</td>
-                      <td className="ai-right ai-strong">{Number(s.qty || s.quantity || s.stock || 0)}</td>
+                      <td className="ai-strong">{s.productId?.title || s.productId?.name || "-"}</td>
+                      <td className="ai-sub">{s.productId?.sku || "-"}</td>
+                      <td className="ai-right ai-strong">{Number(s.qty || 0)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -289,7 +249,6 @@ export default function AdminInventory() {
           )}
         </div>
 
-        {/* MOVEMENTS */}
         <div className="ai-card ai-span2">
           <h3>Historiku (Movements)</h3>
 
@@ -314,13 +273,13 @@ export default function AdminInventory() {
                   {movements.map((m) => (
                     <tr key={m._id}>
                       <td className="ai-sub">{fmt(m.createdAt)}</td>
-                      <td className="ai-strong">{m.productId?.title || m.product?.title || "-"}</td>
+                      <td className="ai-strong">{m.productId?.title || m.productId?.name || "-"}</td>
                       <td>
                         <span className={"ai-pill " + (m.type === "IN" ? "is-green" : "is-red")}>
                           {m.type}
                         </span>
                       </td>
-                      <td className="ai-right ai-strong">{Number(m.qty || m.quantity || 0)}</td>
+                      <td className="ai-right ai-strong">{Number(m.qty || 0)}</td>
                       <td className="ai-sub">{m.reason || "-"}</td>
                       <td className="ai-sub">{m.note || "-"}</td>
                     </tr>

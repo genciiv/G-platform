@@ -1,3 +1,4 @@
+// client/src/pages/Admin/Warehouses/AdminWarehouses.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "./adminWarehouses.css";
 import { http, getErrMsg } from "../../../lib/api.js";
@@ -20,13 +21,7 @@ export default function AdminWarehouses() {
     setLoading(true);
     try {
       const res = await http.get("/api/warehouses");
-
-      // ✅ suporton te dy formatet:
-      // 1) res.json(itemsArray)
-      // 2) res.json({ items: itemsArray })
-      const data = res.data;
-      const list = Array.isArray(data) ? data : data?.items || [];
-
+      const list = res.data?.items || res.data || [];
       setItems(Array.isArray(list) ? list : []);
     } catch (e) {
       setErr(getErrMsg(e, "S’u arrit të merren magazinat"));
@@ -38,6 +33,11 @@ export default function AdminWarehouses() {
   useEffect(() => {
     load();
   }, []);
+
+  const countActive = useMemo(
+    () => items.filter((x) => (x.active ?? true) === true).length,
+    [items]
+  );
 
   const resetForm = () => {
     setName("");
@@ -66,13 +66,11 @@ export default function AdminWarehouses() {
     setErr("");
     try {
       const payload = { name, code, location, active };
-
       if (editing?._id) {
         await http.put(`/api/warehouses/${editing._id}`, payload);
       } else {
         await http.post("/api/warehouses", payload);
       }
-
       setOpen(false);
       resetForm();
       await load();
@@ -82,7 +80,7 @@ export default function AdminWarehouses() {
   }
 
   async function remove(id) {
-    if (!window.confirm("Ta fshij këtë magazinë?")) return;
+    if (!confirm("Ta fshij këtë magazinë?")) return;
     setErr("");
     try {
       await http.delete(`/api/warehouses/${id}`);
@@ -91,11 +89,6 @@ export default function AdminWarehouses() {
       setErr(getErrMsg(e2, "Nuk u fshi magazina"));
     }
   }
-
-  const countActive = useMemo(
-    () => items.filter((x) => (x.active ?? true) === true).length,
-    [items]
-  );
 
   return (
     <div className="aw-wrap">
@@ -134,46 +127,41 @@ export default function AdminWarehouses() {
         ) : items.length === 0 ? (
           <div className="aw-empty">S’ka magazina.</div>
         ) : (
-          <table className="aw-table">
-            <thead>
-              <tr>
-                <th>Emri</th>
-                <th>Kodi</th>
-                <th>Lokacion</th>
-                <th>Status</th>
-                <th className="aw-col-actions">Veprime</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((w) => (
-                <tr key={w._id}>
-                  <td className="aw-strong">{w.name}</td>
-                  <td>{w.code || "-"}</td>
-                  <td>{w.location || "-"}</td>
-                  <td>
-                    <span
-                      className={
-                        "aw-pill " + ((w.active ?? true) ? "is-green" : "is-gray")
-                      }
-                    >
-                      {(w.active ?? true) ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="aw-actions-cell">
-                    <button className="aw-btn" onClick={() => openEdit(w)}>
-                      Edit
-                    </button>
-                    <button
-                      className="aw-btn aw-btn--danger"
-                      onClick={() => remove(w._id)}
-                    >
-                      Fshi
-                    </button>
-                  </td>
+          <div className="aw-tableWrap">
+            <table className="aw-table">
+              <thead>
+                <tr>
+                  <th>Emri</th>
+                  <th>Kodi</th>
+                  <th>Lokacion</th>
+                  <th>Status</th>
+                  <th className="aw-col-actions">Veprime</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {items.map((w) => (
+                  <tr key={w._id}>
+                    <td className="aw-strong">{w.name}</td>
+                    <td className="aw-sub">{w.code || "-"}</td>
+                    <td className="aw-sub">{w.location || "-"}</td>
+                    <td>
+                      <span className={"aw-pill " + ((w.active ?? true) ? "is-green" : "is-gray")}>
+                        {(w.active ?? true) ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="aw-actions-cell">
+                      <button className="aw-btn" onClick={() => openEdit(w)}>
+                        Edit
+                      </button>
+                      <button className="aw-btn aw-btn--danger" onClick={() => remove(w._id)}>
+                        Fshi
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -181,48 +169,35 @@ export default function AdminWarehouses() {
         <div className="aw-modalOverlay" onMouseDown={() => setOpen(false)}>
           <div className="aw-modal" onMouseDown={(e) => e.stopPropagation()}>
             <div className="aw-modalHead">
-              <div className="aw-modalTitle">
-                {editing ? "Edit magazinë" : "Shto magazinë"}
-              </div>
-              <button className="aw-x" onClick={() => setOpen(false)}>
-                ✕
-              </button>
+              <div className="aw-modalTitle">{editing ? "Edit magazinë" : "Shto magazinë"}</div>
+              <button className="aw-x" onClick={() => setOpen(false)}>✕</button>
             </div>
 
             <form className="aw-form" onSubmit={save}>
               <label>Emri *</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
+              <input value={name} onChange={(e) => setName(e.target.value)} required />
 
-              <label>Kodi</label>
-              <input
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="p.sh. WH-01"
-              />
+              <div className="aw-row2">
+                <label>
+                  Kodi
+                  <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="p.sh. WH-01" />
+                </label>
 
-              <label>Lokacion</label>
-              <input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="p.sh. Fier"
-              />
+                <label>
+                  Lokacion
+                  <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="p.sh. Fier" />
+                </label>
+              </div>
 
               <label className="aw-check">
-                <input
-                  type="checkbox"
-                  checked={active}
-                  onChange={(e) => setActive(e.target.checked)}
-                />
+                <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
                 Active
               </label>
 
-              <button className="aw-btn aw-btn--primary" type="submit">
-                Ruaj
-              </button>
+              <div className="aw-formActions">
+                <button className="aw-btn aw-btn--primary" type="submit">Ruaj</button>
+                <button className="aw-btn" type="button" onClick={() => setOpen(false)}>Anulo</button>
+              </div>
             </form>
           </div>
         </div>
