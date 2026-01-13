@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FiTruck,
@@ -35,43 +35,57 @@ function pickImage(p) {
 }
 
 function isClothing(p) {
-  const t = `${p?.title || ""} ${p?.name || ""} ${p?.category || ""} ${
-    p?.description || ""
-  }`.toLowerCase();
-
+  const t = `${p?.title || ""} ${p?.name || ""} ${p?.category || ""} ${p?.description || ""}`.toLowerCase();
   const keys = [
-    "rrobe",
-    "rroba",
-    "bluze",
-    "t-shirt",
-    "tshirt",
-    "hoodie",
-    "xhup",
-    "xhakete",
-    "xhaketa",
-    "pantallona",
-    "triko",
-    "pulover",
-    "kapele",
-    "këmish",
-    "kemish",
-    "fustan",
-    "jeans",
-    "xhinse",
-    "sneakers",
-    "atlete",
-    "veshje",
-    "veshja",
-    "jack",
-    "jacket",
+    "rrobe","rroba","bluze","t-shirt","tshirt","hoodie","xhup","xhakete","xhaketa",
+    "pantallona","triko","pulover","kapele","këmish","kemish","fustan","jeans",
+    "xhinse","sneakers","atlete","veshje","veshja","jack","jacket",
   ];
-
   return keys.some((k) => t.includes(k));
+}
+
+/** Scroll reveal pa libra */
+function useRevealOnScroll() {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+
+    const prefersReduced =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+
+    const els = Array.from(root.querySelectorAll("[data-reveal]"));
+    if (!els.length) return;
+
+    if (prefersReduced) {
+      els.forEach((el) => el.classList.add("is-in"));
+      return;
+    }
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((en) => {
+          if (en.isIntersecting) {
+            en.target.classList.add("is-in");
+            io.unobserve(en.target);
+          }
+        });
+      },
+      { threshold: 0.12 }
+    );
+
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
+  return ref;
 }
 
 export default function Home() {
   const nav = useNavigate();
   const { addToCart } = useCart();
+  const wrapRef = useRevealOnScroll();
 
   const [loadingP, setLoadingP] = useState(true);
   const [products, setProducts] = useState([]);
@@ -107,37 +121,36 @@ export default function Home() {
   const clothing = useMemo(() => {
     const only = (products || []).filter(isClothing);
     if (only.length >= 4) return only.slice(0, 8);
-    // fallback: nëse s’ka kategori rrobash, merr 8 të parat
     return (products || []).slice(0, 8);
   }, [products]);
 
   function onOpenProduct(p) {
-    // nëse ke route /products/:id
     nav(`/products/${p._id}`);
   }
 
   function onAdd(p) {
-    // pranon shumica e implementimeve: addToCart(product, qty)
     try {
       addToCart(p, 1);
     } catch {
-      // fallback (nqs addToCart pranon vetëm 1 param)
       addToCart(p);
     }
   }
 
   return (
-    <main className="home">
+    <main className="home" ref={wrapRef}>
       {/* HERO */}
-      <section className="hero">
+      <section className="hero" data-reveal>
         <div className="hero-inner">
-          <div className="hero-left">
+          <div className="hero-left" data-reveal>
             <div className="hero-pill">
               <FiTag />
-              <span>Porosi të shpejta + Cash on Delivery</span>
+              <span>Porosi të shpejta · Cash on Delivery</span>
             </div>
 
-            <h1 className="hero-title">G-App Store</h1>
+            <h1 className="hero-title">
+              G-App Store <span className="caret" aria-hidden="true" />
+            </h1>
+
             <p className="hero-sub">
               Blej shpejt, thjesht, dhe me pagesë në dorëzim. Zgjidh produktin,
               bëj porosinë dhe gjurmo statusin kur të duash.
@@ -153,7 +166,7 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="hero-badges">
+            <div className="hero-badges" data-reveal>
               <div className="badge-item">
                 <FiTruck />
                 <span>Dorëzim i shpejtë</span>
@@ -170,7 +183,7 @@ export default function Home() {
           </div>
 
           {/* HERO CARD */}
-          <div className="hero-card">
+          <div className="hero-card" data-reveal>
             <div className="hc-top">
               <div className="hc-title">Si funksionon?</div>
               <div className="hc-muted">3 hapa të thjeshtë</div>
@@ -227,7 +240,7 @@ export default function Home() {
       </section>
 
       {/* ✅ RROBA SECTION */}
-      <section className="section">
+      <section className="section" data-reveal>
         <div className="section-head section-head-row">
           <div>
             <h2>Rroba</h2>
@@ -285,7 +298,7 @@ export default function Home() {
                       aria-label="Hap produktin"
                     >
                       {img ? (
-                        <img src={img} alt={title} />
+                        <img src={img} alt={title} loading="lazy" />
                       ) : (
                         <div className="p-placeholder">
                           <FiShoppingBag />
@@ -295,6 +308,7 @@ export default function Home() {
                       <span className="p-badge">
                         <FiHeart /> Rroba
                       </span>
+                      <span className="p-shine" aria-hidden="true" />
                     </button>
 
                     <div className="p-body">
@@ -304,7 +318,9 @@ export default function Home() {
 
                       <div className="p-meta">
                         <div className="p-price">{money(price)}</div>
-                        {p?.sku ? <div className="p-sku">SKU: {p.sku}</div> : null}
+                        {p?.sku ? (
+                          <div className="p-sku">SKU: {p.sku}</div>
+                        ) : null}
                       </div>
 
                       <div className="p-actions">
@@ -334,7 +350,7 @@ export default function Home() {
       </section>
 
       {/* FEATURES */}
-      <section className="section">
+      <section className="section" data-reveal>
         <div className="section-head">
           <h2>Pse G-App?</h2>
           <p>
@@ -350,8 +366,8 @@ export default function Home() {
             </div>
             <h3>Siguri</h3>
             <p>
-              Sesion i sigurt, kontroll i aksesit për user dhe admin, dhe
-              pagesë në dorëzim.
+              Sesion i sigurt, kontroll i aksesit për user dhe admin, dhe pagesë
+              në dorëzim.
             </p>
           </div>
 
@@ -380,7 +396,7 @@ export default function Home() {
       </section>
 
       {/* QUICK LINKS */}
-      <section className="section alt">
+      <section className="section alt" data-reveal>
         <div className="section-head">
           <h2>Shkurt & saktë</h2>
           <p>Zgjidh ku do të shkosh tani.</p>
@@ -434,7 +450,7 @@ export default function Home() {
       </section>
 
       {/* TRUST STRIP */}
-      <section className="trust">
+      <section className="trust" data-reveal>
         <div className="trust-inner">
           <div className="trust-item">
             <FiMapPin />
@@ -463,13 +479,11 @@ export default function Home() {
       </section>
 
       {/* FOOTER */}
-      <footer className="footer">
+      <footer className="footer" data-reveal>
         <div className="footer-inner">
           <div className="f-left">
             <div className="f-brand">G-App</div>
-            <div className="f-sub">
-              Dyqan modern me porosi dhe gjurmim të thjeshtë.
-            </div>
+            <div className="f-sub">Dyqan modern me porosi dhe gjurmim të thjeshtë.</div>
           </div>
 
           <div className="f-links">

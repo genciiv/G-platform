@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { http } from "../../lib/api.js";
-import { useCart } from "../../context/cartContext.jsx";
 import {
   FiSearch,
   FiFilter,
   FiX,
-  FiShoppingBag,
   FiChevronDown,
-  FiTag,
+  FiShoppingBag,
+  FiHeart,
+  FiArrowUpRight,
 } from "react-icons/fi";
+import { http } from "../../lib/api.js";
+import { useCart } from "../../context/cartContext.jsx";
 import "./products.css";
 
 function money(v) {
@@ -21,12 +22,12 @@ function money(v) {
   }).format(n);
 }
 
-function pickImages(p) {
+function pickImage(p) {
   const imgs = p?.images || p?.imageUrls || p?.photos || [];
-  if (Array.isArray(imgs) && imgs.length) return imgs.filter(Boolean);
-  if (typeof p?.image === "string" && p.image) return [p.image];
-  if (typeof p?.thumbnail === "string" && p.thumbnail) return [p.thumbnail];
-  return [];
+  if (Array.isArray(imgs) && imgs.length) return imgs[0];
+  if (typeof p?.image === "string" && p.image) return p.image;
+  if (typeof p?.thumbnail === "string" && p.thumbnail) return p.thumbnail;
+  return "";
 }
 
 function getTitle(p) {
@@ -34,33 +35,51 @@ function getTitle(p) {
 }
 
 function getPrice(p) {
-  return Number(p?.salePrice ?? p?.price ?? 0);
+  const v = p?.salePrice ?? p?.price ?? 0;
+  return Number(v || 0);
+}
+
+function getSku(p) {
+  return p?.sku || p?.SKU || "";
 }
 
 function getCategory(p) {
-  return (p?.category || p?.categoryName || "").trim();
+  return (p?.category || p?.type || p?.tag || "").toString().trim();
 }
+
+function isActive(p) {
+  // prano disa variante: status "Aktiv", active true, isActive true
+  if (typeof p?.active === "boolean") return p.active;
+  if (typeof p?.isActive === "boolean") return p.isActive;
+  const s = (p?.status || "").toString().toLowerCase();
+  if (!s) return true; // nëse s’ka status, e konsiderojmë aktiv
+  return s.includes("aktiv") || s.includes("active");
+}
+
+const SORTS = [
+  { key: "newest", label: "Më të rejat" },
+  { key: "price_asc", label: "Çmimi: Ulët → Lartë" },
+  { key: "price_desc", label: "Çmimi: Lartë → Ulët" },
+  { key: "title_asc", label: "Emri: A → Z" },
+];
 
 export default function Products() {
   const nav = useNavigate();
-  const cart = useCart();
-
-  const addToCart =
-    cart?.addToCart ||
-    cart?.add ||
-    ((p) => console.warn("Missing addToCart in cartContext", p));
+  const { addToCart } = useCart();
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [items, setItems] = useState([]);
+  const [products, setProducts] = useState([]);
 
-  // filters
+  // UI state
   const [q, setQ] = useState("");
-  const [category, setCategory] = useState("all");
-  const [sort, setSort] = useState("new"); // new | price_asc | price_desc | name_asc
+  const [sort, setSort] = useState("newest");
+  const [onlyActive, setOnlyActive] = useState(true);
+  const [cat, setCat] = useState("all");
   const [minP, setMinP] = useState("");
   const [maxP, setMaxP] = useState("");
-  const [onlyActive, setOnlyActive] = useState(false);
+
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -72,11 +91,11 @@ export default function Products() {
         const res = await http.get("/api/products");
         const list = res.data?.items || res.data?.products || res.data || [];
         if (!alive) return;
-        setItems(Array.isArray(list) ? list : []);
+        setProducts(Array.isArray(list) ? list : []);
       } catch (e) {
         if (!alive) return;
-        setErr("Nuk u morën produktet.");
-        setItems([]);
+        setErr("Nuk u morën produktet. Provo rifresko.");
+        setProducts([]);
       } finally {
         if (!alive) return;
         setLoading(false);
@@ -84,72 +103,62 @@ export default function Products() {
     }
 
     load();
-    return () => {
-      alive = false;
-    };
+    return () => (alive = false);
   }, []);
 
   const categories = useMemo(() => {
-    const set = new Set();
-    for (const p of items) {
+    const map = new Map();
+    (products || []).forEach((p) => {
       const c = getCategory(p);
-      if (c) set.add(c);
-    }
-    return ["all", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
-  }, [items]);
+      if (c) map.set(c.toLowerCase(), c);
+    });
+    const list = Array.from(map.values()).sort((a, b) =>
+      a.localeCompare(b, "sq-AL")
+    );
+    return ["all", ...list];
+  }, [products]);
 
-  const priceBounds = useMemo(() => {
-    const prices = items.map(getPrice).filter((x) => Number.isFinite(x));
-    if (!prices.length) return { min: 0, max: 0 };
-    return { min: Math.min(...prices), max: Math.max(...prices) };
-  }, [items]);
+  const priceStats = useMemo(() => {
+    const nums = (products || []).map(getPrice).filter((n) => Number.isFinite(n));
+    if (!nums.length) return { min: 0, max: 0 };
+    return { min: Math.min(...nums), max: Math.max(...nums) };
+  }, [products]);
 
   const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
+    const qq = q.trim().toLowerCase();
     const min = minP === "" ? null : Number(minP);
     const max = maxP === "" ? null : Number(maxP);
 
-    let list = [...items];
+    let list = (products || []).slice();
 
-    if (onlyActive) {
+    if (onlyActive) list = list.filter(isActive);
+
+    if (cat !== "all") {
+      const c = cat.toLowerCase();
+      list = list.filter((p) => getCategory(p).toLowerCase() === c);
+    }
+
+    if (qq) {
       list = list.filter((p) => {
-        const s = String(p?.status || p?.state || "").toLowerCase();
-        // pranon "active", "aktiv", true, etj.
-        if (p?.active === true) return true;
-        if (s.includes("active") || s.includes("aktiv")) return true;
-        return false;
+        const t = `${getTitle(p)} ${getCategory(p)} ${getSku(p)} ${p?.description || ""}`.toLowerCase();
+        return t.includes(qq);
       });
     }
 
-    if (term) {
-      list = list.filter((p) => {
-        const blob = `${getTitle(p)} ${getCategory(p)} ${p?.sku || ""} ${
-          p?.description || ""
-        }`.toLowerCase();
-        return blob.includes(term);
-      });
-    }
-
-    if (category !== "all") {
-      list = list.filter((p) => getCategory(p) === category);
-    }
-
-    if (Number.isFinite(min)) {
+    if (min !== null && Number.isFinite(min)) {
       list = list.filter((p) => getPrice(p) >= min);
     }
-    if (Number.isFinite(max)) {
+
+    if (max !== null && Number.isFinite(max)) {
       list = list.filter((p) => getPrice(p) <= max);
     }
 
     // sort
-    if (sort === "price_asc") {
-      list.sort((a, b) => getPrice(a) - getPrice(b));
-    } else if (sort === "price_desc") {
-      list.sort((a, b) => getPrice(b) - getPrice(a));
-    } else if (sort === "name_asc") {
-      list.sort((a, b) => getTitle(a).localeCompare(getTitle(b)));
-    } else {
-      // "new": nëse ka createdAt përdore, përndryshe mbaje
+    if (sort === "price_asc") list.sort((a, b) => getPrice(a) - getPrice(b));
+    if (sort === "price_desc") list.sort((a, b) => getPrice(b) - getPrice(a));
+    if (sort === "title_asc") list.sort((a, b) => getTitle(a).localeCompare(getTitle(b)));
+    if (sort === "newest") {
+      // nëse ka createdAt, përdore; përndryshe ruaj rendin siç vjen
       list.sort((a, b) => {
         const da = new Date(a?.createdAt || 0).getTime();
         const db = new Date(b?.createdAt || 0).getTime();
@@ -158,18 +167,18 @@ export default function Products() {
     }
 
     return list;
-  }, [items, q, category, sort, minP, maxP, onlyActive]);
+  }, [products, q, onlyActive, cat, minP, maxP, sort]);
 
-  function resetFilters() {
+  function clearFilters() {
     setQ("");
-    setCategory("all");
-    setSort("new");
+    setSort("newest");
+    setOnlyActive(true);
+    setCat("all");
     setMinP("");
     setMaxP("");
-    setOnlyActive(false);
   }
 
-  function openDetails(p) {
+  function onOpen(p) {
     nav(`/products/${p._id}`);
   }
 
@@ -181,206 +190,286 @@ export default function Products() {
     }
   }
 
+  const hasFilters =
+    q.trim() ||
+    sort !== "newest" ||
+    !onlyActive ||
+    cat !== "all" ||
+    minP !== "" ||
+    maxP !== "";
+
   return (
-    <main className="products-page">
-      <section className="p-hero">
-        <div className="p-hero-inner">
-          <div className="p-hero-left">
+    <main className="shop">
+      <section className="shop-top">
+        <div className="shop-head">
+          <div>
             <h1>Produkte</h1>
-            <p>Gjej rrobat / produktet dhe shto shpejt në shportë.</p>
+            <p>
+              Kërko, filtro dhe shto shpejt në shportë. {products?.length || 0} produkte.
+            </p>
           </div>
 
-          <div className="p-hero-right">
-            <Link to="/cart" className="p-cart-link">
-              <FiShoppingBag />
-              Shporta
-            </Link>
+          <div className="shop-actions">
+            <button
+              className="btn btn-ghost shop-filter-btn"
+              type="button"
+              onClick={() => setMobileFiltersOpen(true)}
+            >
+              <FiFilter /> Filtra
+            </button>
+
+            <div className="sort">
+              <div className="sort-label">Rendit:</div>
+              <div className="sort-select">
+                <FiChevronDown className="sort-ico" />
+                <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                  {SORTS.map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
         </div>
-      </section>
 
-      <section className="p-tools">
-        <div className="p-tools-inner">
-          <div className="p-search">
-            <FiSearch className="p-search-ico" />
+        {/* Search bar */}
+        <div className="shop-bar">
+          <div className="search">
+            <FiSearch />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Kërko (titull / SKU / kategori)..."
-              className="p-search-input"
+              placeholder="Kërko (titull / SKU / kategori)…"
+              aria-label="Kërko produkte"
             />
-            {q ? (
-              <button
-                className="p-clear"
-                onClick={() => setQ("")}
-                type="button"
-                aria-label="Pastro"
-              >
+            {q.trim() ? (
+              <button className="icon-btn" type="button" onClick={() => setQ("")} aria-label="Pastro kërkimin">
                 <FiX />
               </button>
             ) : null}
           </div>
 
-          <div className="p-filters">
-            <div className="p-select">
-              <FiTag className="p-sel-ico" />
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c === "all" ? "Të gjitha kategoritë" : c}
-                  </option>
-                ))}
-              </select>
-              <FiChevronDown className="p-sel-arrow" />
-            </div>
+          {hasFilters ? (
+            <button className="btn btn-ghost" type="button" onClick={clearFilters}>
+              <FiX /> Pastro filtrat
+            </button>
+          ) : (
+            <Link to="/cart" className="btn btn-primary">
+              <FiShoppingBag /> Shko te shporta <FiArrowUpRight />
+            </Link>
+          )}
+        </div>
+      </section>
 
-            <div className="p-select">
-              <FiFilter className="p-sel-ico" />
-              <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                <option value="new">Më të rejat</option>
-                <option value="price_asc">Çmimi ↑</option>
-                <option value="price_desc">Çmimi ↓</option>
-                <option value="name_asc">Emri A-Z</option>
-              </select>
-              <FiChevronDown className="p-sel-arrow" />
-            </div>
+      <section className="shop-body">
+        {/* LEFT FILTERS (desktop) */}
+        <aside className="filters">
+          <div className="filters-card">
+            <div className="filters-title">Filtrat</div>
 
-            <div className="p-price">
-              <input
-                type="number"
-                value={minP}
-                onChange={(e) => setMinP(e.target.value)}
-                placeholder={`Min (${priceBounds.min || 0})`}
-              />
-              <span className="p-dash">—</span>
-              <input
-                type="number"
-                value={maxP}
-                onChange={(e) => setMaxP(e.target.value)}
-                placeholder={`Max (${priceBounds.max || 0})`}
-              />
-            </div>
-
-            <label className="p-check">
+            <label className="f-row">
               <input
                 type="checkbox"
                 checked={onlyActive}
                 onChange={(e) => setOnlyActive(e.target.checked)}
               />
-              Vetëm aktivë
+              <span>Vetëm aktiv</span>
             </label>
 
-            <button className="p-reset" onClick={resetFilters} type="button">
-              Reset
+            <div className="f-block">
+              <div className="f-label">Kategori</div>
+              <select value={cat} onChange={(e) => setCat(e.target.value)}>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c === "all" ? "Të gjitha" : c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="f-block">
+              <div className="f-label">Çmimi</div>
+              <div className="price-row">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder={`Min (${priceStats.min || 0})`}
+                  value={minP}
+                  onChange={(e) => setMinP(e.target.value)}
+                />
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder={`Max (${priceStats.max || 0})`}
+                  value={maxP}
+                  onChange={(e) => setMaxP(e.target.value)}
+                />
+              </div>
+              <div className="f-hint">
+                Sugjerim: {money(priceStats.min)} — {money(priceStats.max)}
+              </div>
+            </div>
+
+            <button className="btn btn-ghost" type="button" onClick={clearFilters}>
+              <FiX /> Pastro
             </button>
           </div>
+        </aside>
 
-          <div className="p-meta">
-            {loading ? (
-              <span>Duke ngarkuar...</span>
-            ) : err ? (
-              <span className="p-err">{err}</span>
-            ) : (
-              <span>
-                {filtered.length} / {items.length} produkte
-              </span>
-            )}
+        {/* GRID */}
+        <div className="grid-wrap">
+          <div className="grid-top">
+            <div className="grid-count">
+              {loading ? "Duke ngarkuar…" : `${filtered.length} rezultate`}
+            </div>
           </div>
-        </div>
-      </section>
 
-      <section className="p-grid-wrap">
-        <div className="p-grid">
           {loading ? (
-            Array.from({ length: 8 }).map((_, i) => (
-              <div className="p-skel" key={i}>
-                <div className="p-skel-img" />
-                <div className="p-skel-lines">
-                  <div />
-                  <div />
+            <div className="pgrid">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div className="skeleton" key={i}>
+                  <div className="sk-media" />
+                  <div className="sk-body">
+                    <div className="sk-line w80" />
+                    <div className="sk-line w55" />
+                    <div className="sk-row">
+                      <div className="sk-pill w35" />
+                      <div className="sk-pill w28" />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           ) : err ? (
-            <div className="p-empty">
-              <div className="p-empty-title">Gabim</div>
-              <div className="p-empty-sub">{err}</div>
-              <button
-                className="p-btn"
-                onClick={() => window.location.reload()}
-              >
+            <div className="empty">
+              <div className="empty-title">{err}</div>
+              <div className="empty-sub">Provo rifresko faqen.</div>
+              <button className="btn btn-primary" type="button" onClick={() => window.location.reload()}>
                 Rifresko
               </button>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="p-empty">
-              <div className="p-empty-title">S’ka rezultate</div>
-              <div className="p-empty-sub">
-                Provo të ndryshosh filtrat ose kërkimin.
+            <div className="empty">
+              <div className="empty-title">Nuk u gjet asnjë produkt.</div>
+              <div className="empty-sub">
+                Provo ndrysho filtrat ose fjalën e kërkimit.
               </div>
-              <button className="p-btn" onClick={resetFilters}>
+              <button className="btn btn-ghost" type="button" onClick={clearFilters}>
                 Pastro filtrat
               </button>
             </div>
           ) : (
-            filtered.map((p) => {
-              const imgs = pickImages(p);
-              const img = imgs[0] || "";
-              const title = getTitle(p);
-              const price = getPrice(p);
-              const sku = p?.sku ? String(p.sku) : "";
-              const cat = getCategory(p);
+            <div className="pgrid">
+              {filtered.map((p) => {
+                const img = pickImage(p);
+                const title = getTitle(p);
+                const price = getPrice(p);
+                const sku = getSku(p);
+                const category = getCategory(p);
 
-              return (
-                <div className="p-card" key={p._id}>
-                  <button
-                    className="p-img"
-                    type="button"
-                    onClick={() => openDetails(p)}
-                    aria-label="Hap produktin"
-                  >
-                    {img ? (
-                      <img src={img} alt={title} />
-                    ) : (
-                      <div className="p-noimg">
-                        <FiShoppingBag />
-                        <span>Pa foto</span>
+                return (
+                  <div className="pcard" key={p._id}>
+                    <button className="pmedia" type="button" onClick={() => onOpen(p)} aria-label="Hap produktin">
+                      {img ? <img src={img} alt={title} loading="lazy" /> : <div className="pnoimg"><FiShoppingBag /> Pa foto</div>}
+                      <span className="pbadge"><FiHeart /> {category || "Produkt"}</span>
+                      <span className="pshine" aria-hidden="true" />
+                    </button>
+
+                    <div className="pbody">
+                      <div className="ptitle" title={title}>{title}</div>
+
+                      <div className="pmeta">
+                        <div className="pprice">{money(price)}</div>
+                        {sku ? <div className="psku">SKU: {sku}</div> : <div className="psku muted">—</div>}
                       </div>
-                    )}
-                    {cat ? <span className="p-badge">{cat}</span> : null}
-                  </button>
 
-                  <div className="p-body">
-                    <div className="p-title" title={title}>
-                      {title}
-                    </div>
-
-                    <div className="p-row">
-                      <div className="p-priceVal">{money(price)}</div>
-                      {sku ? <div className="p-sku">SKU: {sku}</div> : null}
-                    </div>
-
-                    <div className="p-actions">
-                      <button
-                        className="p-btn p-btn-dark"
-                        onClick={() => onAdd(p)}
-                      >
-                        <FiShoppingBag /> Shto
-                      </button>
-                      <button className="p-btn" onClick={() => openDetails(p)}>
-                        Detaje
-                      </button>
+                      <div className="pactions">
+                        <button className="btn btn-primary btn-sm" type="button" onClick={() => onAdd(p)}>
+                          <FiShoppingBag /> Shto
+                        </button>
+                        <button className="btn btn-ghost btn-sm" type="button" onClick={() => onOpen(p)}>
+                          Detaje <FiArrowUpRight />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
       </section>
+
+      {/* MOBILE FILTER DRAWER */}
+      {mobileFiltersOpen ? (
+        <div className="drawer" role="dialog" aria-modal="true" aria-label="Filtra">
+          <div className="drawer-backdrop" onClick={() => setMobileFiltersOpen(false)} />
+          <div className="drawer-panel">
+            <div className="drawer-head">
+              <div className="drawer-title">Filtra</div>
+              <button className="icon-btn" type="button" onClick={() => setMobileFiltersOpen(false)} aria-label="Mbyll">
+                <FiX />
+              </button>
+            </div>
+
+            <div className="drawer-body">
+              <label className="f-row">
+                <input
+                  type="checkbox"
+                  checked={onlyActive}
+                  onChange={(e) => setOnlyActive(e.target.checked)}
+                />
+                <span>Vetëm aktiv</span>
+              </label>
+
+              <div className="f-block">
+                <div className="f-label">Kategori</div>
+                <select value={cat} onChange={(e) => setCat(e.target.value)}>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c === "all" ? "Të gjitha" : c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="f-block">
+                <div className="f-label">Çmimi</div>
+                <div className="price-row">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    placeholder={`Min (${priceStats.min || 0})`}
+                    value={minP}
+                    onChange={(e) => setMinP(e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    placeholder={`Max (${priceStats.max || 0})`}
+                    value={maxP}
+                    onChange={(e) => setMaxP(e.target.value)}
+                  />
+                </div>
+                <div className="f-hint">
+                  Sugjerim: {money(priceStats.min)} — {money(priceStats.max)}
+                </div>
+              </div>
+            </div>
+
+            <div className="drawer-foot">
+              <button className="btn btn-ghost" type="button" onClick={clearFilters}>
+                <FiX /> Pastro
+              </button>
+              <button className="btn btn-primary" type="button" onClick={() => setMobileFiltersOpen(false)}>
+                Apliko
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
