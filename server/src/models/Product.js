@@ -1,26 +1,35 @@
-// server/src/models/Product.js
+// server/src/models/Product.js (pjesa kryesore)
 import mongoose from "mongoose";
+
+const specSchema = new mongoose.Schema(
+  {
+    key: { type: String, trim: true, required: true },
+    value: { type: String, trim: true, required: true },
+  },
+  { _id: false }
+);
 
 const productSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
     sku: { type: String, trim: true },
-    description: { type: String, default: "" },
-    price: { type: Number, required: true, min: 0 },
+    price: { type: Number, required: true },
+    active: { type: Boolean, default: true },
 
-    // ✅ multiple image urls
-    images: { type: [String], default: [] },
+    // ✅ kategori
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      default: null,
+    },
 
-    // ✅ category relation
-    category: { type: mongoose.Schema.Types.ObjectId, ref: "Category", default: null },
+    // ✅ fotot me URL (siç i ke tani)
+    images: [{ type: String, trim: true }],
 
-    isActive: { type: Boolean, default: true },
+    // ✅ opsione / data dinamike
+    specs: [specSchema],
   },
   { timestamps: true }
 );
-
-productSchema.index({ title: 1 });
-productSchema.index({ sku: 1 });
-productSchema.index({ category: 1 });
 
 export default mongoose.model("Product", productSchema);

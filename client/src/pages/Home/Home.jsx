@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FiTruck,
@@ -34,95 +34,37 @@ function pickImage(p) {
   return "";
 }
 
-function isClothing(p) {
-  const t = `${p?.title || ""} ${p?.name || ""} ${p?.category || ""} ${p?.description || ""}`.toLowerCase();
-  const keys = [
-    "rrobe","rroba","bluze","t-shirt","tshirt","hoodie","xhup","xhakete","xhaketa",
-    "pantallona","triko","pulover","kapele","këmish","kemish","fustan","jeans",
-    "xhinse","sneakers","atlete","veshje","veshja","jack","jacket",
-  ];
-  return keys.some((k) => t.includes(k));
-}
-
-/** Scroll reveal pa libra */
-function useRevealOnScroll() {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
-
-    const prefersReduced =
-      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-
-    const els = Array.from(root.querySelectorAll("[data-reveal]"));
-    if (!els.length) return;
-
-    if (prefersReduced) {
-      els.forEach((el) => el.classList.add("is-in"));
-      return;
-    }
-
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((en) => {
-          if (en.isIntersecting) {
-            en.target.classList.add("is-in");
-            io.unobserve(en.target);
-          }
-        });
-      },
-      { threshold: 0.12 }
-    );
-
-    els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
-
-  return ref;
-}
-
 export default function Home() {
   const nav = useNavigate();
   const { addToCart } = useCart();
-  const wrapRef = useRevealOnScroll();
 
-  const [loadingP, setLoadingP] = useState(true);
-  const [products, setProducts] = useState([]);
-  const [pErr, setPErr] = useState("");
+  const [sections, setSections] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
     let alive = true;
 
-    async function load() {
-      setLoadingP(true);
-      setPErr("");
+    async function loadHome() {
+      setLoading(true);
+      setErr("");
       try {
-        const res = await http.get("/api/products");
-        const list = res.data?.items || res.data?.products || res.data || [];
+        const res = await http.get("/api/home");
         if (!alive) return;
-        setProducts(Array.isArray(list) ? list : []);
+        setSections(res.data?.sections || []);
       } catch (e) {
         if (!alive) return;
-        setPErr("Nuk u morën produktet.");
-        setProducts([]);
+        setErr("Nuk u morën seksionet e home.");
+        setSections([]);
       } finally {
         if (!alive) return;
-        setLoadingP(false);
+        setLoading(false);
       }
     }
 
-    load();
-    return () => {
-      alive = false;
-    };
+    loadHome();
+    return () => (alive = false);
   }, []);
-
-  const clothing = useMemo(() => {
-    const only = (products || []).filter(isClothing);
-    if (only.length >= 4) return only.slice(0, 8);
-    return (products || []).slice(0, 8);
-  }, [products]);
 
   function onOpenProduct(p) {
     nav(`/products/${p._id}`);
@@ -136,21 +78,23 @@ export default function Home() {
     }
   }
 
+  const hasSections = useMemo(
+    () => Array.isArray(sections) && sections.length > 0,
+    [sections]
+  );
+
   return (
-    <main className="home" ref={wrapRef}>
+    <main className="home">
       {/* HERO */}
-      <section className="hero" data-reveal>
+      <section className="hero">
         <div className="hero-inner">
-          <div className="hero-left" data-reveal>
+          <div className="hero-left">
             <div className="hero-pill">
               <FiTag />
-              <span>Porosi të shpejta · Cash on Delivery</span>
+              <span>Porosi të shpejta + Cash on Delivery</span>
             </div>
 
-            <h1 className="hero-title">
-              G-App Store <span className="caret" aria-hidden="true" />
-            </h1>
-
+            <h1 className="hero-title">G-App Store</h1>
             <p className="hero-sub">
               Blej shpejt, thjesht, dhe me pagesë në dorëzim. Zgjidh produktin,
               bëj porosinë dhe gjurmo statusin kur të duash.
@@ -166,7 +110,7 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="hero-badges" data-reveal>
+            <div className="hero-badges">
               <div className="badge-item">
                 <FiTruck />
                 <span>Dorëzim i shpejtë</span>
@@ -183,7 +127,7 @@ export default function Home() {
           </div>
 
           {/* HERO CARD */}
-          <div className="hero-card" data-reveal>
+          <div className="hero-card">
             <div className="hc-top">
               <div className="hc-title">Si funksionon?</div>
               <div className="hc-muted">3 hapa të thjeshtë</div>
@@ -239,124 +183,153 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ✅ RROBA SECTION */}
-      <section className="section" data-reveal>
-        <div className="section-head section-head-row">
-          <div>
-            <h2>Rroba</h2>
-            <p>
-              Zgjedhjet tona për veshje – shto shpejt në shportë ose shiko
-              detajet.
-            </p>
-          </div>
-
-          <Link to="/products" className="mini-link">
-            Shiko të gjitha <FiChevronRight />
-          </Link>
+      {/* ✅ HOME SECTIONS (kategoritë) */}
+      <section className="section">
+        <div className="section-head">
+          <h2>Seksione</h2>
+          <p>Këto shfaqen automatikisht nga kategoritë që ke “Show on Home”.</p>
         </div>
 
         <div className="clothes-wrap">
-          {loadingP ? (
+          {loading ? (
             <div className="empty">
               <div className="spinner" />
-              <div className="empty-title">Duke ngarkuar produktet...</div>
+              <div className="empty-title">Duke ngarkuar home...</div>
               <div className="empty-sub">Një moment.</div>
             </div>
-          ) : pErr ? (
+          ) : err ? (
             <div className="empty">
-              <div className="empty-title">{pErr}</div>
+              <div className="empty-title">{err}</div>
               <div className="empty-sub">
-                Provo rifresko faqen ose shko te “Produkte”.
+                Provo rifresko faqen ose kontrollo serverin.
               </div>
               <Link to="/products" className="btn btn-ghost">
                 Hap Produktet
               </Link>
             </div>
-          ) : clothing.length === 0 ? (
+          ) : !hasSections ? (
             <div className="empty">
-              <div className="empty-title">S’ka produkte për momentin.</div>
-              <div className="empty-sub">
-                Shto produkte nga Admin dhe do shfaqen këtu.
+              <div className="empty-title">
+                S’ka kategori të vendosura për Home.
               </div>
-              <Link to="/products" className="btn btn-ghost">
-                Shiko Produktet
+              <div className="empty-sub">
+                Te Admin → Kategori: aktivizo “Show on Home”.
+              </div>
+              <Link to="/admin/categories" className="btn btn-ghost">
+                Shko te Admin Kategori
               </Link>
             </div>
-          ) : (
-            <div className="clothes-grid">
-              {clothing.map((p) => {
-                const img = pickImage(p);
-                const title = p?.title || p?.name || "Produkt";
-                const price = p?.price ?? p?.salePrice ?? 0;
-
-                return (
-                  <div className="p-card" key={p._id}>
-                    <button
-                      className="p-media"
-                      onClick={() => onOpenProduct(p)}
-                      type="button"
-                      aria-label="Hap produktin"
-                    >
-                      {img ? (
-                        <img src={img} alt={title} loading="lazy" />
-                      ) : (
-                        <div className="p-placeholder">
-                          <FiShoppingBag />
-                          <span>Pa foto</span>
-                        </div>
-                      )}
-                      <span className="p-badge">
-                        <FiHeart /> Rroba
-                      </span>
-                      <span className="p-shine" aria-hidden="true" />
-                    </button>
-
-                    <div className="p-body">
-                      <div className="p-title" title={title}>
-                        {title}
-                      </div>
-
-                      <div className="p-meta">
-                        <div className="p-price">{money(price)}</div>
-                        {p?.sku ? (
-                          <div className="p-sku">SKU: {p.sku}</div>
-                        ) : null}
-                      </div>
-
-                      <div className="p-actions">
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={() => onAdd(p)}
-                        >
-                          <FiShoppingBag /> Shto
-                        </button>
-
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => onOpenProduct(p)}
-                        >
-                          Detaje <FiChevronRight />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          ) : null}
         </div>
       </section>
 
+      {sections.map((sec) => (
+        <section
+          className="section"
+          key={sec.category?._id || sec.category?.slug}
+        >
+          <div className="section-head section-head-row">
+            <div>
+              <h2>{sec.category?.name || "Kategori"}</h2>
+              <p>Zgjedhje nga {sec.category?.name || "kategoria"}.</p>
+            </div>
+
+            <Link
+              to={`/products?category=${encodeURIComponent(
+                sec.category?.slug || ""
+              )}`}
+              className="mini-link"
+            >
+              Shiko të gjitha <FiChevronRight />
+            </Link>
+          </div>
+
+          <div className="clothes-wrap">
+            {Array.isArray(sec.items) && sec.items.length ? (
+              <div className="clothes-grid">
+                {sec.items.map((p) => {
+                  const img = pickImage(p);
+                  const title = p?.title || p?.name || "Produkt";
+                  const price = p?.price ?? p?.salePrice ?? 0;
+
+                  return (
+                    <div className="p-card" key={p._id}>
+                      <button
+                        className="p-media"
+                        onClick={() => onOpenProduct(p)}
+                        type="button"
+                        aria-label="Hap produktin"
+                      >
+                        {img ? (
+                          <img src={img} alt={title} />
+                        ) : (
+                          <div className="p-placeholder">
+                            <FiShoppingBag />
+                            <span>Pa foto</span>
+                          </div>
+                        )}
+
+                        <span className="p-badge">
+                          <FiHeart /> {sec.category?.name || "Produkt"}
+                        </span>
+                      </button>
+
+                      <div className="p-body">
+                        <div className="p-title" title={title}>
+                          {title}
+                        </div>
+
+                        <div className="p-meta">
+                          <div className="p-price">{money(price)}</div>
+                          {p?.sku ? (
+                            <div className="p-sku">SKU: {p.sku}</div>
+                          ) : null}
+                        </div>
+
+                        <div className="p-actions">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={() => onAdd(p)}
+                          >
+                            <FiShoppingBag /> Shto
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => onOpenProduct(p)}
+                          >
+                            Detaje <FiChevronRight />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty">
+                <div className="empty-title">
+                  S’ka produkte në këtë kategori.
+                </div>
+                <div className="empty-sub">
+                  Shto produkte në kategorinë “{sec.category?.name}”.
+                </div>
+                <Link to="/admin/products" className="btn btn-ghost">
+                  Shko te Admin Produkte
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+      ))}
+
       {/* FEATURES */}
-      <section className="section" data-reveal>
+      <section className="section">
         <div className="section-head">
           <h2>Pse G-App?</h2>
-          <p>
-            Dizajn i pastër, porosi të menaxhuara, dhe gjurmim i thjeshtë për
-            klientin.
-          </p>
+          <p>Dizajn i pastër, porosi të menaxhuara, dhe gjurmim i thjeshtë.</p>
         </div>
 
         <div className="grid-3">
@@ -376,10 +349,7 @@ export default function Home() {
               <FiRefreshCcw />
             </div>
             <h3>Rifreskim i shpejtë</h3>
-            <p>
-              Produktet, shporta, porositë dhe statuset rifreskohen lehtë pa
-              stres.
-            </p>
+            <p>Produktet, shporta, porositë dhe statuset rifreskohen lehtë.</p>
           </div>
 
           <div className="card">
@@ -387,16 +357,13 @@ export default function Home() {
               <FiTruck />
             </div>
             <h3>Gjurmim porosie</h3>
-            <p>
-              Klienti gjurmon me kod + telefon. Admini menaxhon statuset në
-              panel.
-            </p>
+            <p>Klienti gjurmon me kod + telefon. Admini menaxhon statuset.</p>
           </div>
         </div>
       </section>
 
       {/* QUICK LINKS */}
-      <section className="section alt" data-reveal>
+      <section className="section alt">
         <div className="section-head">
           <h2>Shkurt & saktë</h2>
           <p>Zgjidh ku do të shkosh tani.</p>
@@ -450,7 +417,7 @@ export default function Home() {
       </section>
 
       {/* TRUST STRIP */}
-      <section className="trust" data-reveal>
+      <section className="trust">
         <div className="trust-inner">
           <div className="trust-item">
             <FiMapPin />
@@ -479,11 +446,13 @@ export default function Home() {
       </section>
 
       {/* FOOTER */}
-      <footer className="footer" data-reveal>
+      <footer className="footer">
         <div className="footer-inner">
           <div className="f-left">
             <div className="f-brand">G-App</div>
-            <div className="f-sub">Dyqan modern me porosi dhe gjurmim të thjeshtë.</div>
+            <div className="f-sub">
+              Dyqan modern me porosi dhe gjurmim të thjeshtë.
+            </div>
           </div>
 
           <div className="f-links">

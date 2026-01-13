@@ -7,11 +7,8 @@ import {
   FiRefreshCcw,
   FiSearch,
   FiImage,
-  FiTag,
-  FiCheckCircle,
-  FiAlertTriangle,
 } from "react-icons/fi";
-import { http } from "../../../lib/api.js"; // ✅ FIX: nga pages/Admin/Products -> pages/Admin -> pages -> src (3 nivele)
+import { http } from "../../../lib/api.js";
 import "./adminProducts.css";
 
 function money(v) {
@@ -23,7 +20,7 @@ function money(v) {
   }).format(n);
 }
 
-function getFirstImage(p) {
+function pickImage(p) {
   const imgs = p?.images || p?.imageUrls || p?.photos || [];
   if (Array.isArray(imgs) && imgs.length) return imgs[0];
   if (typeof p?.image === "string" && p.image) return p.image;
@@ -31,51 +28,49 @@ function getFirstImage(p) {
   return "";
 }
 
+const emptyForm = {
+  title: "",
+  sku: "",
+  price: "",
+  active: true,
+  category: "",
+  images: [""], // URL list
+  specs: [{ key: "", value: "" }], // dynamic
+};
+
 export default function AdminProducts() {
+  const [items, setItems] = useState([]);
+  const [cats, setCats] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-
   const [q, setQ] = useState("");
-  const [onlyActive, setOnlyActive] = useState(true);
 
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [mode, setMode] = useState("create"); // create | edit
-  const [editingId, setEditingId] = useState(null);
+  const [editing, setEditing] = useState(null); // product object
 
-  const emptyForm = {
-    title: "",
-    sku: "",
-    price: "",
-    active: true,
-    categoryId: "",
-    imagesText: "", // URL list (1 per line or comma)
-    description: "",
-  };
   const [form, setForm] = useState(emptyForm);
 
   async function loadAll() {
     setLoading(true);
     setErr("");
     try {
-      const [pRes, cRes] = await Promise.all([
+      const [pr, cr] = await Promise.all([
         http.get("/api/products"),
         http.get("/api/categories"),
       ]);
 
-      const plist = pRes.data?.items || pRes.data?.products || pRes.data || [];
-      const clist =
-        cRes.data?.items || cRes.data?.categories || cRes.data || [];
+      const products = pr.data?.items || pr.data?.products || pr.data || [];
+      const categories = cr.data?.items || cr.data?.categories || cr.data || [];
 
-      setProducts(Array.isArray(plist) ? plist : []);
-      setCategories(Array.isArray(clist) ? clist : []);
+      setItems(Array.isArray(products) ? products : []);
+      setCats(Array.isArray(categories) ? categories : []);
     } catch (e) {
-      setErr("S’u morën të dhënat. Kontrollo serverin / endpoint-et.");
-      setProducts([]);
-      setCategories([]);
+      setErr("Nuk u morën produktet/kategoritë.");
+      setItems([]);
+      setCats([]);
     } finally {
       setLoading(false);
     }
@@ -86,38 +81,51 @@ export default function AdminProducts() {
   }, []);
 
   const filtered = useMemo(() => {
-    const s = (q || "").trim().toLowerCase();
-    return (products || [])
-      .filter((p) => (onlyActive ? !!p?.active : true))
-      .filter((p) => {
-        if (!s) return true;
-        const t = `${p?.title || ""} ${p?.name || ""} ${p?.sku || ""} ${
-          p?.categoryName || ""
-        }`.toLowerCase();
-        return t.includes(s);
-      });
-  }, [products, q, onlyActive]);
+    const s = q.trim().toLowerCase();
+    if (!s) return items;
+    return (items || []).filter((p) => {
+      const t = `${p?.title || ""} ${p?.name || ""} ${
+        p?.sku || ""
+      }`.toLowerCase();
+      const catName =
+        typeof p?.category === "object"
+          ? `${p?.category?.name || ""} ${
+              p?.category?.slug || ""
+            }`.toLowerCase()
+          : "";
+      return t.includes(s) || catName.includes(s);
+    });
+  }, [items, q]);
 
   function openCreate() {
-    setMode("create");
-    setEditingId(null);
+    setEditing(null);
     setForm(emptyForm);
     setOpen(true);
   }
 
   function openEdit(p) {
-    setMode("edit");
-    setEditingId(p?._id);
-    const imgs = p?.images || p?.imageUrls || p?.photos || [];
+    setEditing(p);
+
+    // normalize category id
+    const catId =
+      typeof p?.category === "object" ? p?.category?._id : p?.category || "";
+
+    const imgs = Array.isArray(p?.images) && p.images.length ? p.images : [""];
+    const specs =
+      Array.isArray(p?.specs) && p.specs.length
+        ? p.specs
+        : [{ key: "", value: "" }];
+
     setForm({
       title: p?.title || p?.name || "",
       sku: p?.sku || "",
       price: p?.price ?? "",
-      active: !!p?.active,
-      categoryId: p?.categoryId || p?.category?._id || "",
-      imagesText: Array.isArray(imgs) ? imgs.join("\n") : "",
-      description: p?.description || "",
+      active: typeof p?.active === "boolean" ? p.active : true,
+      category: catId || "",
+      images: imgs,
+      specs: specs,
     });
+
     setOpen(true);
   }
 
@@ -126,82 +134,125 @@ export default function AdminProducts() {
     setOpen(false);
   }
 
-  function parseImages(text) {
-    const raw = (text || "")
-      .split(/\n|,/g)
-      .map((x) => x.trim())
-      .filter(Boolean);
-    // uniq
-    return [...new Set(raw)];
+  function setField(name, value) {
+    setForm((p) => ({ ...p, [name]: value }));
   }
 
-  async function onSave(e) {
-    e.preventDefault();
-    setErr("");
+  // images helpers
+  function addImageRow() {
+    setForm((p) => ({ ...p, images: [...(p.images || []), ""] }));
+  }
+  function removeImageRow(i) {
+    setForm((p) => {
+      const next = (p.images || []).filter((_, idx) => idx !== i);
+      return { ...p, images: next.length ? next : [""] };
+    });
+  }
+  function changeImage(i, val) {
+    setForm((p) => ({
+      ...p,
+      images: (p.images || []).map((x, idx) => (idx === i ? val : x)),
+    }));
+  }
 
+  // specs helpers
+  function addSpec() {
+    setForm((p) => ({
+      ...p,
+      specs: [...(p.specs || []), { key: "", value: "" }],
+    }));
+  }
+  function removeSpec(i) {
+    setForm((p) => {
+      const next = (p.specs || []).filter((_, idx) => idx !== i);
+      return { ...p, specs: next.length ? next : [{ key: "", value: "" }] };
+    });
+  }
+  function changeSpec(i, field, val) {
+    setForm((p) => ({
+      ...p,
+      specs: (p.specs || []).map((s, idx) =>
+        idx === i ? { ...s, [field]: val } : s
+      ),
+    }));
+  }
+
+  async function save() {
     const title = form.title.trim();
-    const sku = form.sku.trim();
     const price = Number(form.price);
 
-    if (!title) return setErr("Titulli është i detyrueshëm.");
-    if (!sku) return setErr("SKU është i detyrueshëm.");
+    if (!title) return alert("Shkruaj titullin.");
     if (!Number.isFinite(price) || price < 0)
-      return setErr("Çmimi nuk është valid.");
+      return alert("Çmimi nuk është i saktë.");
+
+    // clean images (only non-empty)
+    const images = (form.images || []).map((x) => x.trim()).filter(Boolean);
+
+    // clean specs (only complete rows)
+    const specs = (form.specs || [])
+      .map((s) => ({
+        key: (s.key || "").trim(),
+        value: (s.value || "").trim(),
+      }))
+      .filter((s) => s.key && s.value);
 
     const payload = {
       title,
-      sku,
+      sku: (form.sku || "").trim(),
       price,
       active: !!form.active,
-      categoryId: form.categoryId || null,
-      images: parseImages(form.imagesText),
-      description: form.description || "",
+      category: form.category || null,
+      images,
+      specs,
     };
 
     setSaving(true);
     try {
-      if (mode === "create") {
-        await http.post("/api/products", payload);
+      if (editing?._id) {
+        await http.put(`/api/products/${editing._id}`, payload);
       } else {
-        await http.put(`/api/products/${editingId}`, payload);
+        await http.post("/api/products", payload);
       }
       setOpen(false);
       await loadAll();
-    } catch (e2) {
-      setErr("Nuk u ruajt produkti. Kontrollo backend-in.");
+    } catch (e) {
+      alert("Gabim gjatë ruajtjes.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function onDelete(p) {
-    const ok = window.confirm(`Ta fshij produktin "${p?.title || p?.name}"?`);
+  async function removeItem(p) {
+    const ok = confirm(`Ta fshij produktin "${p?.title || p?.name}"?`);
     if (!ok) return;
 
-    setErr("");
     try {
       await http.delete(`/api/products/${p._id}`);
       await loadAll();
     } catch {
-      setErr("S’u fshi produkti. Kontrollo backend-in.");
+      alert("Nuk u fshi produkti.");
     }
   }
 
   return (
-    <div className="ap-wrap">
-      <div className="ap-head">
+    <div className="ap">
+      <div className="ap-top">
         <div>
-          <h1 className="ap-title">Produkte</h1>
-          <p className="ap-sub">
-            Krijo / ndrysho / fshi produkte. Kategoritë lidhen me dropdown.
-          </p>
+          <div className="ap-pill">Paneli i administrimit</div>
+          <h1>Produkte</h1>
+          <p>Krijo / ndrysho / fshi produkte. Kategori lidhet me dropdown.</p>
         </div>
 
         <div className="ap-actions">
-          <button className="ap-btn ap-btnGhost" onClick={loadAll} type="button">
+          <button className="ap-btn" onClick={loadAll} type="button">
             <FiRefreshCcw /> Rifresko
           </button>
-          <button className="ap-btn ap-btnPrimary" onClick={openCreate} type="button">
+
+          <button
+            className="ap-btn ap-btn-primary"
+            onClick={openCreate}
+            type="button"
+          >
             <FiPlus /> Shto produkt
           </button>
         </div>
@@ -217,63 +268,35 @@ export default function AdminProducts() {
           />
         </div>
 
-        <label className="ap-check">
-          <input
-            type="checkbox"
-            checked={onlyActive}
-            onChange={(e) => setOnlyActive(e.target.checked)}
-          />
-          Vetëm aktiv
-        </label>
-
         <div className="ap-count">
           {filtered.length} rezultat{filtered.length === 1 ? "" : "e"}
         </div>
       </div>
 
-      {err ? (
-        <div className="ap-alert ap-alertWarn">
-          <FiAlertTriangle />
-          <span>{err}</span>
-        </div>
-      ) : null}
-
       {loading ? (
-        <div className="ap-skeletonGrid">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div className="ap-skelCard" key={i}>
-              <div className="ap-skelMedia" />
-              <div className="ap-skelLine" />
-              <div className="ap-skelLine short" />
-              <div className="ap-skelRow">
-                <div className="ap-skelPill" />
-                <div className="ap-skelPill" />
-              </div>
-            </div>
-          ))}
+        <div className="ap-empty">
+          <div className="ap-spin" />
+          <div className="ap-empty-title">Duke ngarkuar...</div>
+        </div>
+      ) : err ? (
+        <div className="ap-empty">
+          <div className="ap-empty-title">{err}</div>
+          <button className="ap-btn" onClick={loadAll} type="button">
+            <FiRefreshCcw /> Provo prap
+          </button>
         </div>
       ) : filtered.length === 0 ? (
         <div className="ap-empty">
-          <div className="ap-emptyTitle">S’ka produkte për këto filtra.</div>
-          <div className="ap-emptySub">
-            Pastro kërkimin ose çaktivizo “Vetëm aktiv”.
+          <div className="ap-empty-title">S’ka produkte.</div>
+          <div className="ap-empty-sub">
+            Shto produktin e parë nga butoni sipër.
           </div>
-          <button className="ap-btn ap-btnGhost" onClick={() => setQ("")} type="button">
-            Pastro kërkimin
-          </button>
         </div>
       ) : (
         <div className="ap-grid">
           {filtered.map((p) => {
-            const img = getFirstImage(p);
+            const img = pickImage(p);
             const title = p?.title || p?.name || "Produkt";
-            const price = p?.price ?? 0;
-
-            const catName =
-              p?.categoryName ||
-              categories.find((c) => c._id === (p?.categoryId || p?.category?._id))
-                ?.name ||
-              "Pa kategori";
 
             return (
               <div className="ap-card" key={p._id}>
@@ -281,51 +304,51 @@ export default function AdminProducts() {
                   {img ? (
                     <img src={img} alt={title} />
                   ) : (
-                    <div className="ap-noImg">
+                    <div className="ap-noimg">
                       <FiImage />
                       <span>Pa foto</span>
                     </div>
                   )}
-
-                  <div className={`ap-status ${p?.active ? "ok" : "off"}`}>
-                    {p?.active ? (
-                      <>
-                        <FiCheckCircle /> Aktiv
-                      </>
-                    ) : (
-                      "Jo aktiv"
-                    )}
+                  <div className="ap-badges">
+                    <span
+                      className={p?.active ? "ap-tag ap-on" : "ap-tag ap-off"}
+                    >
+                      {p?.active ? "Aktiv" : "Jo aktiv"}
+                    </span>
                   </div>
                 </div>
 
                 <div className="ap-body">
-                  <div className="ap-rowTop">
-                    <div className="ap-name" title={title}>
-                      {title}
-                    </div>
-                    <div className="ap-price">{money(price)}</div>
+                  <div className="ap-title" title={title}>
+                    {title}
                   </div>
 
                   <div className="ap-meta">
-                    <span className="ap-chip">
-                      <FiTag />
-                      {catName}
-                    </span>
-                    <span className="ap-sku">SKU: {p?.sku || "-"}</span>
+                    <div className="ap-price">{money(p?.price)}</div>
+                    {p?.sku ? <div className="ap-sku">SKU: {p.sku}</div> : null}
                   </div>
 
-                  <div className="ap-cta">
+                  <div className="ap-cat">
+                    Kategori:{" "}
+                    <b>
+                      {typeof p?.category === "object"
+                        ? p?.category?.name || "—"
+                        : "—"}
+                    </b>
+                  </div>
+
+                  <div className="ap-row">
                     <button
-                      className="ap-mini ap-miniEdit"
-                      type="button"
+                      className="ap-btn"
                       onClick={() => openEdit(p)}
+                      type="button"
                     >
                       <FiEdit2 /> Edit
                     </button>
                     <button
-                      className="ap-mini ap-miniDanger"
+                      className="ap-btn ap-danger"
+                      onClick={() => removeItem(p)}
                       type="button"
-                      onClick={() => onDelete(p)}
                     >
                       <FiTrash2 /> Fshi
                     </button>
@@ -339,61 +362,75 @@ export default function AdminProducts() {
 
       {/* MODAL */}
       {open ? (
-        <div className="ap-modalOverlay" onMouseDown={closeModal}>
+        <div
+          className="ap-modal-backdrop"
+          onMouseDown={closeModal}
+          role="presentation"
+        >
           <div className="ap-modal" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="ap-modalHead">
+            <div className="ap-modal-head">
               <div>
-                <div className="ap-modalTitle">
-                  {mode === "create" ? "Shto produkt" : "Ndrysho produkt"}
+                <div className="ap-modal-title">
+                  {editing ? "Ndrysho produkt" : "Shto produkt"}
                 </div>
-                <div className="ap-modalSub">Fusha me * janë të detyrueshme.</div>
+                <div className="ap-modal-sub">
+                  Fotot me URL + opsione dinamike (specs).
+                </div>
               </div>
 
-              <button className="ap-x" type="button" onClick={closeModal} aria-label="Mbyll">
+              <button
+                className="ap-icon-btn"
+                onClick={closeModal}
+                type="button"
+              >
                 <FiX />
               </button>
             </div>
 
-            <form className="ap-form" onSubmit={onSave}>
-              <div className="ap-formGrid">
-                <div className="ap-field">
-                  <label>Titulli *</label>
-                  <input
-                    value={form.title}
-                    onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
-                    placeholder="p.sh. Xhup dimri"
-                  />
-                </div>
+            <div className="ap-form">
+              <div className="ap-col">
+                <label className="ap-label">Titulli</label>
+                <input
+                  className="ap-input"
+                  value={form.title}
+                  onChange={(e) => setField("title", e.target.value)}
+                  placeholder="p.sh. Laptop Dell"
+                />
+              </div>
 
-                <div className="ap-field">
-                  <label>SKU *</label>
+              <div className="ap-2col">
+                <div className="ap-col">
+                  <label className="ap-label">SKU</label>
                   <input
+                    className="ap-input"
                     value={form.sku}
-                    onChange={(e) => setForm((s) => ({ ...s, sku: e.target.value }))}
-                    placeholder="p.sh. WH-3"
+                    onChange={(e) => setField("sku", e.target.value)}
+                    placeholder="p.sh. DL-123"
                   />
                 </div>
 
-                <div className="ap-field">
-                  <label>Çmimi (€) *</label>
+                <div className="ap-col">
+                  <label className="ap-label">Çmimi (€)</label>
                   <input
+                    className="ap-input"
                     value={form.price}
-                    onChange={(e) => setForm((s) => ({ ...s, price: e.target.value }))}
-                    placeholder="p.sh. 20"
+                    onChange={(e) => setField("price", e.target.value)}
+                    placeholder="p.sh. 199"
                     inputMode="decimal"
                   />
                 </div>
+              </div>
 
-                <div className="ap-field">
-                  <label>Kategoria</label>
+              <div className="ap-2col">
+                <div className="ap-col">
+                  <label className="ap-label">Kategori</label>
                   <select
-                    value={form.categoryId}
-                    onChange={(e) =>
-                      setForm((s) => ({ ...s, categoryId: e.target.value }))
-                    }
+                    className="ap-input"
+                    value={form.category}
+                    onChange={(e) => setField("category", e.target.value)}
                   >
-                    <option value="">Pa kategori</option>
-                    {(categories || []).map((c) => (
+                    <option value="">— Pa kategori —</option>
+                    {cats.map((c) => (
                       <option key={c._id} value={c._id}>
                         {c.name}
                       </option>
@@ -401,63 +438,129 @@ export default function AdminProducts() {
                   </select>
                 </div>
 
-                <div className="ap-field ap-fieldWide">
-                  <label>Foto (URL) – 1 për rresht ose me presje</label>
-                  <textarea
-                    value={form.imagesText}
-                    onChange={(e) =>
-                      setForm((s) => ({ ...s, imagesText: e.target.value }))
-                    }
-                    placeholder={"https://...\nhttps://..."}
-                    rows={4}
-                  />
+                <div className="ap-col ap-check">
+                  <label className="ap-label">Aktiv</label>
+                  <label className="ap-switch">
+                    <input
+                      type="checkbox"
+                      checked={!!form.active}
+                      onChange={(e) => setField("active", e.target.checked)}
+                    />
+                    <span />
+                    <b>{form.active ? "Po" : "Jo"}</b>
+                  </label>
+                </div>
+              </div>
+
+              {/* IMAGES */}
+              <div className="ap-block">
+                <div className="ap-block-head">
+                  <div>
+                    <div className="ap-block-title">Fotot (URL)</div>
+                    <div className="ap-block-sub">
+                      Mund të shtosh sa të duash (URL).
+                    </div>
+                  </div>
+                  <button
+                    className="ap-btn"
+                    onClick={addImageRow}
+                    type="button"
+                  >
+                    <FiPlus /> Shto foto
+                  </button>
                 </div>
 
-                <div className="ap-field ap-fieldWide">
-                  <label>Përshkrimi</label>
-                  <textarea
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm((s) => ({ ...s, description: e.target.value }))
-                    }
-                    placeholder="Përshkrim i shkurtër..."
-                    rows={3}
-                  />
+                <div className="ap-list">
+                  {(form.images || []).map((url, i) => (
+                    <div className="ap-line" key={i}>
+                      <input
+                        className="ap-input"
+                        value={url}
+                        onChange={(e) => changeImage(i, e.target.value)}
+                        placeholder="https://..."
+                      />
+                      <button
+                        className="ap-icon-btn ap-icon-danger"
+                        onClick={() => removeImageRow(i)}
+                        type="button"
+                        title="Fshi"
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* SPECS */}
+              <div className="ap-block">
+                <div className="ap-block-head">
+                  <div>
+                    <div className="ap-block-title">
+                      Opsione / të dhëna (Specs)
+                    </div>
+                    <div className="ap-block-sub">
+                      p.sh. RAM=16GB, Ngjyra=E zezë, Material=Pambuk
+                    </div>
+                  </div>
+                  <button className="ap-btn" onClick={addSpec} type="button">
+                    <FiPlus /> Shto fushë
+                  </button>
                 </div>
 
-                <label className="ap-toggle">
-                  <input
-                    type="checkbox"
-                    checked={!!form.active}
-                    onChange={(e) =>
-                      setForm((s) => ({ ...s, active: e.target.checked }))
-                    }
-                  />
-                  Aktiv
-                </label>
-              </div>
+                <div className="ap-spec-grid">
+                  {(form.specs || []).map((s, i) => (
+                    <div className="ap-spec" key={i}>
+                      <input
+                        className="ap-input"
+                        value={s.key}
+                        onChange={(e) => changeSpec(i, "key", e.target.value)}
+                        placeholder="Emri (p.sh. RAM)"
+                      />
+                      <input
+                        className="ap-input"
+                        value={s.value}
+                        onChange={(e) => changeSpec(i, "value", e.target.value)}
+                        placeholder="Vlera (p.sh. 16GB)"
+                      />
+                      <button
+                        className="ap-icon-btn ap-icon-danger"
+                        onClick={() => removeSpec(i)}
+                        type="button"
+                        title="Fshi"
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </div>
+                  ))}
+                </div>
 
-              <div className="ap-formActions">
-                <button
-                  type="button"
-                  className="ap-btn ap-btnGhost"
-                  onClick={closeModal}
-                  disabled={saving}
-                >
-                  Anulo
-                </button>
-                <button className="ap-btn ap-btnPrimary" type="submit" disabled={saving}>
-                  {saving ? "Duke ruajtur..." : "Ruaj"}
-                </button>
+                <div className="ap-hint">
+                  Shënim: rreshtat bosh nuk ruhen (ruhen vetëm ata që kanë key +
+                  value).
+                </div>
               </div>
-            </form>
+            </div>
 
-            {err ? (
-              <div className="ap-alert ap-alertWarn" style={{ marginTop: 10 }}>
-                <FiAlertTriangle />
-                <span>{err}</span>
-              </div>
-            ) : null}
+            <div className="ap-modal-foot">
+              <button
+                className="ap-btn"
+                onClick={closeModal}
+                type="button"
+                disabled={saving}
+              >
+                Anulo
+              </button>
+
+              <button
+                className="ap-btn ap-btn-primary"
+                onClick={save}
+                type="button"
+                disabled={saving}
+              >
+                {saving ? "Duke ruajtur..." : "Ruaj"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
