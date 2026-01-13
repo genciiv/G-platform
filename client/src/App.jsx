@@ -5,6 +5,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Header from "./components/Header/Header.jsx";
 import "./styles/App.css";
 
+// PUBLIC
 import Home from "./pages/Home/Home.jsx";
 import Products from "./pages/Products/Products.jsx";
 import ProductDetails from "./pages/ProductDetails/ProductDetails.jsx";
@@ -12,7 +13,7 @@ import Cart from "./pages/Cart/Cart.jsx";
 import Checkout from "./pages/Checkout/Checkout.jsx";
 import TrackOrder from "./pages/TrackOrder/TrackOrder.jsx";
 
-// AUTH GATEWAY
+// AUTH
 import AuthGateway from "./pages/Auth/AuthGateway.jsx";
 
 // USER
@@ -25,6 +26,7 @@ import OrderDetails from "./pages/User/Orders/OrderDetails.jsx";
 import AdminLogin from "./pages/Admin/Login/AdminLogin.jsx";
 import AdminLayout from "./pages/Admin/Layout/AdminLayout.jsx";
 import AdminProducts from "./pages/Admin/Products/AdminProducts.jsx";
+import AdminCategories from "./pages/Admin/Categories/AdminCategories.jsx";
 import AdminWarehouses from "./pages/Admin/Warehouses/AdminWarehouses.jsx";
 import AdminInventory from "./pages/Admin/Inventory/AdminInventory.jsx";
 import AdminOrders from "./pages/Admin/Orders/AdminOrders.jsx";
@@ -60,7 +62,7 @@ export default function App() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/track" element={<TrackOrder />} />
 
-        {/* AUTH GATE */}
+        {/* AUTH */}
         <Route path="/auth" element={<AuthGateway />} />
 
         {/* USER */}
@@ -95,6 +97,7 @@ export default function App() {
         >
           <Route index element={<Navigate to="products" replace />} />
           <Route path="products" element={<AdminProducts />} />
+          <Route path="categories" element={<AdminCategories />} />
           <Route path="warehouses" element={<AdminWarehouses />} />
           <Route path="inventory" element={<AdminInventory />} />
           <Route path="orders" element={<AdminOrders />} />

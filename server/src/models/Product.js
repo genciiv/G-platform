@@ -4,18 +4,23 @@ import mongoose from "mongoose";
 const productSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
-    sku: { type: String, trim: true, default: "" },
-    description: { type: String, trim: true, default: "" },
-    image: { type: String, trim: true, default: "" },
+    sku: { type: String, trim: true },
+    description: { type: String, default: "" },
+    price: { type: Number, required: true, min: 0 },
 
-    price: { type: Number, required: true, min: 0, default: 0 },
+    // ✅ multiple image urls
+    images: { type: [String], default: [] },
 
-    active: { type: Boolean, default: true },
+    // ✅ category relation
+    category: { type: mongoose.Schema.Types.ObjectId, ref: "Category", default: null },
+
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
 
-productSchema.index({ sku: 1 }, { unique: false });
-productSchema.index({ title: "text", sku: "text" });
+productSchema.index({ title: 1 });
+productSchema.index({ sku: 1 });
+productSchema.index({ category: 1 });
 
 export default mongoose.model("Product", productSchema);

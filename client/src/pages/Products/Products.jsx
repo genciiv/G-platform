@@ -7,7 +7,7 @@ import {
   FiChevronDown,
   FiShoppingBag,
   FiHeart,
-  FiArrowUpRight,
+  FiSliders,
 } from "react-icons/fi";
 import { http } from "../../lib/api.js";
 import { useCart } from "../../context/cartContext.jsx";
@@ -30,38 +30,31 @@ function pickImage(p) {
   return "";
 }
 
-function getTitle(p) {
-  return p?.title || p?.name || "Produkt";
-}
-
-function getPrice(p) {
-  const v = p?.salePrice ?? p?.price ?? 0;
-  return Number(v || 0);
-}
-
-function getSku(p) {
-  return p?.sku || p?.SKU || "";
-}
-
-function getCategory(p) {
-  return (p?.category || p?.type || p?.tag || "").toString().trim();
-}
-
-function isActive(p) {
-  // prano disa variante: status "Aktiv", active true, isActive true
-  if (typeof p?.active === "boolean") return p.active;
+/** Trajton “aktiv”-in në disa variante që të mos mbetesh 0 rezultate pa arsye */
+function isActiveProduct(p) {
+  // nëse ka boolean:
   if (typeof p?.isActive === "boolean") return p.isActive;
-  const s = (p?.status || "").toString().toLowerCase();
-  if (!s) return true; // nëse s’ka status, e konsiderojmë aktiv
-  return s.includes("aktiv") || s.includes("active");
+  if (typeof p?.active === "boolean") return p.active;
+
+  // nëse ka status:
+  const s = String(p?.status || p?.state || "").toLowerCase();
+  if (!s) return true; // nëse s’ka status, supozo “aktiv”
+  if (["inactive", "disabled", "draft", "archived"].some((k) => s.includes(k)))
+    return false;
+  if (["active", "aktiv", "enabled", "published"].some((k) => s.includes(k)))
+    return true;
+
+  // fallback
+  return true;
 }
 
-const SORTS = [
-  { key: "newest", label: "Më të rejat" },
-  { key: "price_asc", label: "Çmimi: Ulët → Lartë" },
-  { key: "price_desc", label: "Çmimi: Lartë → Ulët" },
-  { key: "title_asc", label: "Emri: A → Z" },
-];
+function getCategoryName(p) {
+  // mund të jetë p.category si string, ose {name}, ose categoryId
+  if (typeof p?.category === "string") return p.category;
+  if (p?.category?.name) return p.category.name;
+  if (p?.categoryName) return p.categoryName;
+  return "";
+}
 
 export default function Products() {
   const nav = useNavigate();
@@ -69,17 +62,17 @@ export default function Products() {
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+
   const [products, setProducts] = useState([]);
 
-  // UI state
+  // UI states
   const [q, setQ] = useState("");
-  const [sort, setSort] = useState("newest");
   const [onlyActive, setOnlyActive] = useState(true);
-  const [cat, setCat] = useState("all");
-  const [minP, setMinP] = useState("");
-  const [maxP, setMaxP] = useState("");
-
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [category, setCategory] = useState("all");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [sort, setSort] = useState("new"); // new | price_asc | price_desc | title
+  const [filtersOpen, setFiltersOpen] = useState(true); // desktop left open
 
   useEffect(() => {
     let alive = true;
@@ -89,12 +82,25 @@ export default function Products() {
       setErr("");
       try {
         const res = await http.get("/api/products");
-        const list = res.data?.items || res.data?.products || res.data || [];
+
+        // prano shumë forma
+        const data = res?.data;
+        const list =
+          data?.items ||
+          data?.products ||
+          data?.data?.items ||
+          data?.data?.products ||
+          data?.data ||
+          data ||
+          [];
+
         if (!alive) return;
-        setProducts(Array.isArray(list) ? list : []);
+
+        const arr = Array.isArray(list) ? list : [];
+        setProducts(arr);
       } catch (e) {
         if (!alive) return;
-        setErr("Nuk u morën produktet. Provo rifresko.");
+        setErr("Nuk u morën produktet. Kontrollo serverin /api/products.");
         setProducts([]);
       } finally {
         if (!alive) return;
@@ -103,79 +109,110 @@ export default function Products() {
     }
 
     load();
-    return () => (alive = false);
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const categories = useMemo(() => {
-    const map = new Map();
-    (products || []).forEach((p) => {
-      const c = getCategory(p);
-      if (c) map.set(c.toLowerCase(), c);
-    });
-    const list = Array.from(map.values()).sort((a, b) =>
-      a.localeCompare(b, "sq-AL")
-    );
-    return ["all", ...list];
+    const set = new Map();
+    for (const p of products) {
+      const name = getCategoryName(p);
+      if (name) set.set(name, name);
+    }
+    return ["all", ...Array.from(set.keys())];
   }, [products]);
 
-  const priceStats = useMemo(() => {
-    const nums = (products || []).map(getPrice).filter((n) => Number.isFinite(n));
-    if (!nums.length) return { min: 0, max: 0 };
-    return { min: Math.min(...nums), max: Math.max(...nums) };
+  const priceRange = useMemo(() => {
+    const prices = (products || [])
+      .map((p) => Number(p?.price ?? p?.salePrice ?? 0))
+      .filter((n) => Number.isFinite(n));
+    const min = prices.length ? Math.min(...prices) : 0;
+    const max = prices.length ? Math.max(...prices) : 0;
+    return { min, max };
   }, [products]);
 
   const filtered = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    const min = minP === "" ? null : Number(minP);
-    const max = maxP === "" ? null : Number(maxP);
+    const minN =
+      minPrice === "" ? null : Number(String(minPrice).replace(",", "."));
+    const maxN =
+      maxPrice === "" ? null : Number(String(maxPrice).replace(",", "."));
 
-    let list = (products || []).slice();
+    let out = (products || []).slice();
 
-    if (onlyActive) list = list.filter(isActive);
+    if (onlyActive) out = out.filter(isActiveProduct);
 
-    if (cat !== "all") {
-      const c = cat.toLowerCase();
-      list = list.filter((p) => getCategory(p).toLowerCase() === c);
+    if (category !== "all") {
+      out = out.filter((p) => (getCategoryName(p) || "") === category);
     }
 
     if (qq) {
-      list = list.filter((p) => {
-        const t = `${getTitle(p)} ${getCategory(p)} ${getSku(p)} ${p?.description || ""}`.toLowerCase();
-        return t.includes(qq);
+      out = out.filter((p) => {
+        const title = String(p?.title || p?.name || "").toLowerCase();
+        const sku = String(p?.sku || "").toLowerCase();
+        const cat = String(getCategoryName(p) || "").toLowerCase();
+        return (
+          title.includes(qq) ||
+          sku.includes(qq) ||
+          cat.includes(qq) ||
+          String(p?._id || "").toLowerCase().includes(qq)
+        );
       });
     }
 
-    if (min !== null && Number.isFinite(min)) {
-      list = list.filter((p) => getPrice(p) >= min);
+    if (minN !== null && Number.isFinite(minN)) {
+      out = out.filter((p) => {
+        const price = Number(p?.price ?? p?.salePrice ?? 0);
+        return price >= minN;
+      });
     }
 
-    if (max !== null && Number.isFinite(max)) {
-      list = list.filter((p) => getPrice(p) <= max);
+    if (maxN !== null && Number.isFinite(maxN)) {
+      out = out.filter((p) => {
+        const price = Number(p?.price ?? p?.salePrice ?? 0);
+        return price <= maxN;
+      });
     }
 
     // sort
-    if (sort === "price_asc") list.sort((a, b) => getPrice(a) - getPrice(b));
-    if (sort === "price_desc") list.sort((a, b) => getPrice(b) - getPrice(a));
-    if (sort === "title_asc") list.sort((a, b) => getTitle(a).localeCompare(getTitle(b)));
-    if (sort === "newest") {
-      // nëse ka createdAt, përdore; përndryshe ruaj rendin siç vjen
-      list.sort((a, b) => {
+    if (sort === "price_asc") {
+      out.sort(
+        (a, b) =>
+          Number(a?.price ?? a?.salePrice ?? 0) -
+          Number(b?.price ?? b?.salePrice ?? 0)
+      );
+    } else if (sort === "price_desc") {
+      out.sort(
+        (a, b) =>
+          Number(b?.price ?? b?.salePrice ?? 0) -
+          Number(a?.price ?? a?.salePrice ?? 0)
+      );
+    } else if (sort === "title") {
+      out.sort((a, b) =>
+        String(a?.title || a?.name || "").localeCompare(
+          String(b?.title || b?.name || "")
+        )
+      );
+    } else {
+      // new: nëse ke createdAt, përndryshe lëre siç vjen
+      out.sort((a, b) => {
         const da = new Date(a?.createdAt || 0).getTime();
         const db = new Date(b?.createdAt || 0).getTime();
         return db - da;
       });
     }
 
-    return list;
-  }, [products, q, onlyActive, cat, minP, maxP, sort]);
+    return out;
+  }, [products, q, onlyActive, category, minPrice, maxPrice, sort]);
 
   function clearFilters() {
     setQ("");
-    setSort("newest");
     setOnlyActive(true);
-    setCat("all");
-    setMinP("");
-    setMaxP("");
+    setCategory("all");
+    setMinPrice("");
+    setMaxPrice("");
+    setSort("new");
   }
 
   function onOpen(p) {
@@ -190,86 +227,99 @@ export default function Products() {
     }
   }
 
-  const hasFilters =
-    q.trim() ||
-    sort !== "newest" ||
-    !onlyActive ||
-    cat !== "all" ||
-    minP !== "" ||
-    maxP !== "";
+  const totalText = loading ? "—" : `${filtered.length}`;
 
   return (
-    <main className="shop">
-      <section className="shop-top">
-        <div className="shop-head">
-          <div>
+    <main className="products-page">
+      {/* TOP BAR */}
+      <section className="p-top">
+        <div className="p-top-inner">
+          <div className="p-title">
             <h1>Produkte</h1>
             <p>
-              Kërko, filtro dhe shto shpejt në shportë. {products?.length || 0} produkte.
+              Kërko, filtro dhe shto shpejt në shportë.{" "}
+              <b>{totalText}</b> rezultate.
             </p>
           </div>
 
-          <div className="shop-actions">
+          <div className="p-actions">
             <button
-              className="btn btn-ghost shop-filter-btn"
+              className="chip"
               type="button"
-              onClick={() => setMobileFiltersOpen(true)}
+              onClick={() => setFiltersOpen((v) => !v)}
             >
-              <FiFilter /> Filtra
+              <FiFilter />
+              Filtra
+              <FiChevronDown
+                className={filtersOpen ? "rot" : ""}
+                style={{ marginLeft: 2 }}
+              />
             </button>
 
-            <div className="sort">
-              <div className="sort-label">Rendit:</div>
-              <div className="sort-select">
-                <FiChevronDown className="sort-ico" />
-                <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                  {SORTS.map((s) => (
-                    <option key={s.key} value={s.key}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <label className="select">
+              <span>Rendit:</span>
+              <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="new">Më të rejat</option>
+                <option value="price_asc">Çmimi: më i ulët</option>
+                <option value="price_desc">Çmimi: më i lartë</option>
+                <option value="title">Titulli (A–Z)</option>
+              </select>
+            </label>
+
+            <Link to="/cart" className="btn btn-primary">
+              <FiShoppingBag /> Shko te shporta
+            </Link>
           </div>
         </div>
 
-        {/* Search bar */}
-        <div className="shop-bar">
-          <div className="search">
+        {/* SEARCH */}
+        <div className="p-search-row">
+          <div className="p-search">
             <FiSearch />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Kërko (titull / SKU / kategori)…"
-              aria-label="Kërko produkte"
+              placeholder="Kërko (titull / SKU / kategori)..."
             />
-            {q.trim() ? (
-              <button className="icon-btn" type="button" onClick={() => setQ("")} aria-label="Pastro kërkimin">
+            {q ? (
+              <button
+                className="icon-btn"
+                type="button"
+                onClick={() => setQ("")}
+                aria-label="Pastro kërkimin"
+              >
                 <FiX />
               </button>
             ) : null}
           </div>
 
-          {hasFilters ? (
-            <button className="btn btn-ghost" type="button" onClick={clearFilters}>
-              <FiX /> Pastro filtrat
-            </button>
-          ) : (
-            <Link to="/cart" className="btn btn-primary">
-              <FiShoppingBag /> Shko te shporta <FiArrowUpRight />
-            </Link>
-          )}
+          <div className="p-right-mini">
+            {category !== "all" ? (
+              <span className="mini-pill">
+                <FiSliders /> {category}
+              </span>
+            ) : null}
+            {(q || category !== "all" || minPrice || maxPrice || !onlyActive) ? (
+              <button className="mini-link" type="button" onClick={clearFilters}>
+                Pastro filtrat
+              </button>
+            ) : null}
+          </div>
         </div>
       </section>
 
-      <section className="shop-body">
-        {/* LEFT FILTERS (desktop) */}
-        <aside className="filters">
-          <div className="filters-card">
-            <div className="filters-title">Filtrat</div>
+      <section className="p-body">
+        {/* FILTERS SIDEBAR */}
+        {filtersOpen ? (
+          <aside className="filters">
+            <div className="filters-head">
+              <div className="filters-title">Filtrat</div>
+              <button className="mini-link" type="button" onClick={clearFilters}>
+                <FiX /> Pastro
+              </button>
+            </div>
 
-            <label className="f-row">
+            <label className="check">
               <input
                 type="checkbox"
                 checked={onlyActive}
@@ -280,12 +330,19 @@ export default function Products() {
 
             <div className="f-block">
               <div className="f-label">Kategori</div>
-              <select value={cat} onChange={(e) => setCat(e.target.value)}>
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c === "all" ? "Të gjitha" : c}
-                  </option>
-                ))}
+              <select
+                className="f-select"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="all">Të gjitha</option>
+                {categories
+                  .filter((c) => c !== "all")
+                  .map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -293,104 +350,124 @@ export default function Products() {
               <div className="f-label">Çmimi</div>
               <div className="price-row">
                 <input
-                  type="number"
+                  className="f-input"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
                   inputMode="decimal"
-                  placeholder={`Min (${priceStats.min || 0})`}
-                  value={minP}
-                  onChange={(e) => setMinP(e.target.value)}
+                  placeholder={`Min (${priceRange.min || 0})`}
                 />
+                <span className="dash">—</span>
                 <input
-                  type="number"
+                  className="f-input"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
                   inputMode="decimal"
-                  placeholder={`Max (${priceStats.max || 0})`}
-                  value={maxP}
-                  onChange={(e) => setMaxP(e.target.value)}
+                  placeholder={`Max (${priceRange.max || 0})`}
                 />
               </div>
-              <div className="f-hint">
-                Sugjerim: {money(priceStats.min)} — {money(priceStats.max)}
+
+              <div className="hint">
+                Sugjerim: {money(priceRange.min)} — {money(priceRange.max)}
+              </div>
+
+              <div className="f-actions">
+                <button className="btn btn-ghost" type="button" onClick={clearFilters}>
+                  Pastro
+                </button>
+                <button className="btn btn-primary" type="button">
+                  Mbyll
+                </button>
               </div>
             </div>
+          </aside>
+        ) : null}
 
-            <button className="btn btn-ghost" type="button" onClick={clearFilters}>
-              <FiX /> Pastro
-            </button>
-          </div>
-        </aside>
-
-        {/* GRID */}
-        <div className="grid-wrap">
-          <div className="grid-top">
-            <div className="grid-count">
-              {loading ? "Duke ngarkuar…" : `${filtered.length} rezultate`}
+        {/* LIST */}
+        <div className="list">
+          <div className="list-head">
+            <div className="list-count">
+              <b>{loading ? "—" : filtered.length}</b> rezultate
             </div>
           </div>
 
           {loading ? (
-            <div className="pgrid">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div className="skeleton" key={i}>
-                  <div className="sk-media" />
-                  <div className="sk-body">
-                    <div className="sk-line w80" />
-                    <div className="sk-line w55" />
-                    <div className="sk-row">
-                      <div className="sk-pill w35" />
-                      <div className="sk-pill w28" />
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="empty">
+              <div className="spinner" />
+              <div className="empty-title">Duke ngarkuar produktet…</div>
+              <div className="empty-sub">Një moment.</div>
             </div>
           ) : err ? (
             <div className="empty">
               <div className="empty-title">{err}</div>
-              <div className="empty-sub">Provo rifresko faqen.</div>
-              <button className="btn btn-primary" type="button" onClick={() => window.location.reload()}>
+              <div className="empty-sub">
+                Hap DevTools → Network dhe shiko a kthehet /api/products.
+              </div>
+              <button className="btn btn-ghost" type="button" onClick={() => window.location.reload()}>
                 Rifresko
               </button>
             </div>
           ) : filtered.length === 0 ? (
             <div className="empty">
-              <div className="empty-title">Nuk u gjet asnjë produkt.</div>
-              <div className="empty-sub">
-                Provo ndrysho filtrat ose fjalën e kërkimit.
-              </div>
+              <div className="empty-title">S’ka rezultate.</div>
+              <div className="empty-sub">Provo ndrysho filtrat ose kërkimin.</div>
               <button className="btn btn-ghost" type="button" onClick={clearFilters}>
                 Pastro filtrat
               </button>
+
+              <div className="debug">
+                <div className="debug-line">
+                  <b>Debug:</b> total products = {products.length}
+                </div>
+                <div className="debug-line">
+                  onlyActive = {String(onlyActive)}, category = {category || "all"}
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="pgrid">
+            <div className="grid">
               {filtered.map((p) => {
                 const img = pickImage(p);
-                const title = getTitle(p);
-                const price = getPrice(p);
-                const sku = getSku(p);
-                const category = getCategory(p);
+                const title = p?.title || p?.name || "Produkt";
+                const price = p?.price ?? p?.salePrice ?? 0;
+                const sku = p?.sku;
 
                 return (
-                  <div className="pcard" key={p._id}>
-                    <button className="pmedia" type="button" onClick={() => onOpen(p)} aria-label="Hap produktin">
-                      {img ? <img src={img} alt={title} loading="lazy" /> : <div className="pnoimg"><FiShoppingBag /> Pa foto</div>}
-                      <span className="pbadge"><FiHeart /> {category || "Produkt"}</span>
-                      <span className="pshine" aria-hidden="true" />
+                  <div className="card" key={p._id}>
+                    <button
+                      className="media"
+                      type="button"
+                      onClick={() => onOpen(p)}
+                      aria-label="Hap produktin"
+                    >
+                      {img ? (
+                        <img src={img} alt={title} />
+                      ) : (
+                        <div className="placeholder">
+                          <FiShoppingBag />
+                          <span>Pa foto</span>
+                        </div>
+                      )}
+                      <span className="badge">
+                        <FiHeart /> Produkt
+                      </span>
                     </button>
 
-                    <div className="pbody">
-                      <div className="ptitle" title={title}>{title}</div>
-
-                      <div className="pmeta">
-                        <div className="pprice">{money(price)}</div>
-                        {sku ? <div className="psku">SKU: {sku}</div> : <div className="psku muted">—</div>}
+                    <div className="body">
+                      <div className="title" title={title}>
+                        {title}
                       </div>
 
-                      <div className="pactions">
+                      <div className="meta">
+                        <div className="price">{money(price)}</div>
+                        {sku ? <div className="sku">SKU: {sku}</div> : <div className="sku"> </div>}
+                      </div>
+
+                      <div className="actions">
                         <button className="btn btn-primary btn-sm" type="button" onClick={() => onAdd(p)}>
                           <FiShoppingBag /> Shto
                         </button>
                         <button className="btn btn-ghost btn-sm" type="button" onClick={() => onOpen(p)}>
-                          Detaje <FiArrowUpRight />
+                          Detaje
                         </button>
                       </div>
                     </div>
@@ -401,75 +478,6 @@ export default function Products() {
           )}
         </div>
       </section>
-
-      {/* MOBILE FILTER DRAWER */}
-      {mobileFiltersOpen ? (
-        <div className="drawer" role="dialog" aria-modal="true" aria-label="Filtra">
-          <div className="drawer-backdrop" onClick={() => setMobileFiltersOpen(false)} />
-          <div className="drawer-panel">
-            <div className="drawer-head">
-              <div className="drawer-title">Filtra</div>
-              <button className="icon-btn" type="button" onClick={() => setMobileFiltersOpen(false)} aria-label="Mbyll">
-                <FiX />
-              </button>
-            </div>
-
-            <div className="drawer-body">
-              <label className="f-row">
-                <input
-                  type="checkbox"
-                  checked={onlyActive}
-                  onChange={(e) => setOnlyActive(e.target.checked)}
-                />
-                <span>Vetëm aktiv</span>
-              </label>
-
-              <div className="f-block">
-                <div className="f-label">Kategori</div>
-                <select value={cat} onChange={(e) => setCat(e.target.value)}>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c === "all" ? "Të gjitha" : c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="f-block">
-                <div className="f-label">Çmimi</div>
-                <div className="price-row">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    placeholder={`Min (${priceStats.min || 0})`}
-                    value={minP}
-                    onChange={(e) => setMinP(e.target.value)}
-                  />
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    placeholder={`Max (${priceStats.max || 0})`}
-                    value={maxP}
-                    onChange={(e) => setMaxP(e.target.value)}
-                  />
-                </div>
-                <div className="f-hint">
-                  Sugjerim: {money(priceStats.min)} — {money(priceStats.max)}
-                </div>
-              </div>
-            </div>
-
-            <div className="drawer-foot">
-              <button className="btn btn-ghost" type="button" onClick={clearFilters}>
-                <FiX /> Pastro
-              </button>
-              <button className="btn btn-primary" type="button" onClick={() => setMobileFiltersOpen(false)}>
-                Apliko
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </main>
   );
 }
