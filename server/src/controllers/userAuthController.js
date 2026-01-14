@@ -42,7 +42,9 @@ function toPublicUser(userDoc) {
 export const registerUser = async (req, res) => {
   try {
     const name = String(req.body?.name || "").trim();
-    const email = String(req.body?.email || "").trim().toLowerCase();
+    const email = String(req.body?.email || "")
+      .trim()
+      .toLowerCase();
     const password = String(req.body?.password || "");
 
     if (!name) return res.status(400).json({ message: "Name is required" });
@@ -52,7 +54,8 @@ export const registerUser = async (req, res) => {
     }
 
     const exists = await UserAccount.findOne({ email }).select("_id");
-    if (exists) return res.status(400).json({ message: "Email already exists" });
+    if (exists)
+      return res.status(400).json({ message: "Email already exists" });
 
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -74,11 +77,14 @@ export const registerUser = async (req, res) => {
 
 export const loginUser = async (req, res) => {
   try {
-    const email = String(req.body?.email || "").trim().toLowerCase();
+    const email = String(req.body?.email || "")
+      .trim()
+      .toLowerCase();
     const password = String(req.body?.password || "");
 
     if (!email) return res.status(400).json({ message: "Email is required" });
-    if (!password) return res.status(400).json({ message: "Password is required" });
+    if (!password)
+      return res.status(400).json({ message: "Password is required" });
 
     const user = await UserAccount.findOne({ email });
     if (!user) return res.status(401).json({ message: "Invalid credentials" });
