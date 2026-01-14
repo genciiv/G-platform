@@ -1,4 +1,3 @@
-// server/src/models/Product.js (pjesa kryesore)
 import mongoose from "mongoose";
 
 const specSchema = new mongoose.Schema(
@@ -23,11 +22,14 @@ const productSchema = new mongoose.Schema(
       default: null,
     },
 
-    // ✅ fotot me URL (siç i ke tani)
+    // ✅ fotot (URL)
     images: [{ type: String, trim: true }],
 
-    // ✅ opsione / data dinamike
+    // ✅ detaje dinamike
     specs: [specSchema],
+
+    // ✅ sasia ne stok (e thjeshte)
+    stockQty: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }
 );

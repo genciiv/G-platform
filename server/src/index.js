@@ -4,25 +4,23 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import dotenv from "dotenv";
-
 import { connectDB } from "./config/db.js";
 
 // ROUTES
-import authRoutes from "./routes/authRoutes.js";           // admin auth
-import userAuthRoutes from "./routes/userAuthRoutes.js";   // user auth (register/login)
+import authRoutes from "./routes/authRoutes.js"; // admin
+import userAuthRoutes from "./routes/userAuthRoutes.js"; // users
 import warehouseRoutes from "./routes/warehouseRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
+import homeRoutes from "./routes/homeRoutes.js";
 
 dotenv.config();
 
 const app = express();
 
-/* =========================
-   MIDDLEWARE
-   ========================= */
+// MIDDLEWARE
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
@@ -35,51 +33,48 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan("dev"));
 
-/* =========================
-   HEALTH CHECK
-   ========================= */
-app.get("/api/health", (req, res) => {
-  res.json({ ok: true, time: new Date().toISOString() });
+// HEALTH
+app.get("/api/health", (req, res) => res.json({ ok: true }));
+
+// ✅ DEBUG: të tregon nëse serveri ka /api/home apo jo
+app.get("/api/routes", (req, res) => {
+  res.json({
+    ok: true,
+    routes: [
+      "/api/health",
+      "/api/auth/*",
+      "/api/userauth/*",
+      "/api/warehouses/*",
+      "/api/categories/*",
+      "/api/products/*",
+      "/api/inventory/*",
+      "/api/orders/*",
+      "/api/home",
+    ],
+  });
 });
 
-/* =========================
-   ROUTES
-   ========================= */
-
-// ADMIN AUTH
+// ===== ROUTES =====
 app.use("/api/auth", authRoutes);
-
-// USER AUTH (register / login / me)
 app.use("/api/userauth", userAuthRoutes);
-
-// CORE APP
 app.use("/api/warehouses", warehouseRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/home", homeRoutes);
 
-/* =========================
-   404 HANDLER
-   ========================= */
+// 404 fallback (që ta shohësh qartë kur mungon diçka)
 app.use((req, res) => {
-  res.status(404).json({
-    message: "API route not found",
-    path: req.originalUrl,
-  });
+  res.status(404).json({ message: "Not Found", path: req.originalUrl });
 });
 
-/* =========================
-   SERVER START
-   ========================= */
+// SERVER
 const PORT = process.env.PORT || 5000;
 
 connectDB()
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`✅ MongoDB connected`);
-      console.log(`✅ Server running on ${PORT}`);
-    });
+    app.listen(PORT, () => console.log(`✅ Server running on ${PORT}`));
   })
   .catch((err) => {
     console.error("❌ DB connection failed:", err.message);

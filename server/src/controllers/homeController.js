@@ -3,7 +3,6 @@ import Product from "../models/Product.js";
 
 export async function getHome(req, res) {
   try {
-    // Kategoritë që shfaqen në Home
     const categories = await Category.find({ showOnHome: true }).sort({
       sortOrder: 1,
       createdAt: 1,
@@ -17,14 +16,11 @@ export async function getHome(req, res) {
         category: c._id,
       })
         .sort({ createdAt: -1 })
-        .limit(8);
+        .limit(8)
+        .select("title sku price images specs stockQty active category createdAt");
 
       sections.push({
-        category: {
-          _id: c._id,
-          name: c.name,
-          slug: c.slug,
-        },
+        category: { _id: c._id, name: c.name, slug: c.slug },
         items,
       });
     }

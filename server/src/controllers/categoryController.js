@@ -1,104 +1,93 @@
-// server/src/controllers/categoryController.js
 import Category from "../models/Category.js";
 
-function slugify(str) {
-  return String(str || "")
-    .trim()
-    .toLowerCase()
-    .replace(/ë/g, "e")
-    .replace(/ç/g, "c")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
+function toBool(v) {
+  // vjen nga client si true/false (ose "true"/"false")
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") return v.toLowerCase() === "true";
+  return false;
 }
 
-// PUBLIC: list
+function toNum(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+// GET /api/categories
 export async function listCategories(req, res) {
   try {
-    const onlyActive = String(req.query.active || "1") !== "0";
-    const q = String(req.query.q || "").trim();
-
-    const filter = {};
-    if (onlyActive) filter.isActive = true;
-    if (q) {
-      filter.$or = [
-        { name: { $regex: q, $options: "i" } },
-        { slug: { $regex: q, $options: "i" } },
-      ];
-    }
-
-    const items = await Category.find(filter).sort({ name: 1 });
+    const items = await Category.find().sort({ sortOrder: 1, createdAt: 1 });
     return res.json({ items });
   } catch (err) {
-    console.error("❌ listCategories:", err);
-    return res.status(500).json({ message: "Failed to load categories" });
+    return res.status(500).json({ message: "Categories error", error: err?.message });
   }
 }
 
-// ADMIN: create
+// POST /api/categories
 export async function createCategory(req, res) {
   try {
-    const name = String(req.body?.name || "").trim();
-    const icon = String(req.body?.icon || "").trim();
-    const image = String(req.body?.image || "").trim();
-    const isActive = req.body?.isActive !== false;
+    const name = (req.body?.name || "").trim();
+    const slug = (req.body?.slug || "").trim();
 
     if (!name) return res.status(400).json({ message: "Name is required" });
+    if (!slug) return res.status(400).json({ message: "Slug is required" });
 
-    let slug = String(req.body?.slug || "").trim().toLowerCase();
-    if (!slug) slug = slugify(name);
+    const showOnHome = toBool(req.body?.showOnHome);
+    const sortOrder = toNum(req.body?.sortOrder, 0);
 
-    const exists = await Category.findOne({ slug }).select("_id");
-    if (exists) return res.status(400).json({ message: "Slug already exists" });
+    const created = await Category.create({
+      name,
+      slug,
+      showOnHome,
+      sortOrder,
+    });
 
-    const item = await Category.create({ name, slug, icon, image, isActive });
-    return res.status(201).json({ item });
+    return res.status(201).json({ item: created });
   } catch (err) {
-    console.error("❌ createCategory:", err);
-    return res.status(500).json({ message: "Create failed" });
+    // p.sh. slug unique
+    return res.status(500).json({ message: "Create category error", error: err?.message });
   }
 }
 
-// ADMIN: update
+// PUT /api/categories/:id
 export async function updateCategory(req, res) {
   try {
-    const id = req.params.id;
+    const { id } = req.params;
 
-    const payload = {};
-    if (req.body?.name != null) payload.name = String(req.body.name).trim();
-    if (req.body?.icon != null) payload.icon = String(req.body.icon).trim();
-    if (req.body?.image != null) payload.image = String(req.body.image).trim();
-    if (req.body?.isActive != null) payload.isActive = !!req.body.isActive;
+    const name = (req.body?.name || "").trim();
+    const slug = (req.body?.slug || "").trim();
 
-    if (req.body?.slug != null) {
-      payload.slug = String(req.body.slug).trim().toLowerCase();
-    } else if (payload.name) {
-      // nëse ndryshon emri, nuk ja ndryshojmë slug automatik (që mos prishet linku)
-    }
+    if (!name) return res.status(400).json({ message: "Name is required" });
+    if (!slug) return res.status(400).json({ message: "Slug is required" });
 
-    if (payload.slug) {
-      const exists = await Category.findOne({ slug: payload.slug, _id: { $ne: id } }).select("_id");
-      if (exists) return res.status(400).json({ message: "Slug already exists" });
-    }
+    const showOnHome = toBool(req.body?.showOnHome);
+    const sortOrder = toNum(req.body?.sortOrder, 0);
 
-    const item = await Category.findByIdAndUpdate(id, payload, { new: true });
-    if (!item) return res.status(404).json({ message: "Not found" });
+    const updated = await Category.findByIdAndUpdate(
+      id,
+      {
+        name,
+        slug,
+        showOnHome,   // ✅ kjo ishte pjesa që zakonisht mungon
+        sortOrder,    // ✅ edhe kjo
+      },
+      { new: true, runValidators: true }
+    );
 
-    return res.json({ item });
+    if (!updated) return res.status(404).json({ message: "Category not found" });
+    return res.json({ item: updated });
   } catch (err) {
-    console.error("❌ updateCategory:", err);
-    return res.status(500).json({ message: "Update failed" });
+    return res.status(500).json({ message: "Update category error", error: err?.message });
   }
 }
 
-// ADMIN: delete
+// DELETE /api/categories/:id
 export async function deleteCategory(req, res) {
   try {
-    const id = req.params.id;
-    const ok = await Category.findByIdAndDelete(id);
-    if (!ok) return res.status(404).json({ message: "Not found" });
+    const { id } = req.params;
+    const deleted = await Category.findByIdAndDelete(id);
+    if (!deleted) return res.status(404).json({ message: "Category not found" });
     return res.json({ ok: true });
   } catch (err) {
-    console.error("❌ deleteCategory:", err);
-    return res.status(500).json({ message: "Delete failed" });
+    return res.status(500).json({ message: "Delete category error", error: err?.message });
   }
 }

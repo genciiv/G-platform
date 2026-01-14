@@ -1,3 +1,4 @@
+// client/src/pages/admin/Products/AdminProducts.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   FiPlus,
@@ -32,6 +33,7 @@ const emptyForm = {
   title: "",
   sku: "",
   price: "",
+  stockQty: 0, // ✅ Sasia ne stok
   active: true,
   category: "",
   images: [""], // URL list
@@ -84,14 +86,10 @@ export default function AdminProducts() {
     const s = q.trim().toLowerCase();
     if (!s) return items;
     return (items || []).filter((p) => {
-      const t = `${p?.title || ""} ${p?.name || ""} ${
-        p?.sku || ""
-      }`.toLowerCase();
+      const t = `${p?.title || ""} ${p?.name || ""} ${p?.sku || ""}`.toLowerCase();
       const catName =
         typeof p?.category === "object"
-          ? `${p?.category?.name || ""} ${
-              p?.category?.slug || ""
-            }`.toLowerCase()
+          ? `${p?.category?.name || ""} ${p?.category?.slug || ""}`.toLowerCase()
           : "";
       return t.includes(s) || catName.includes(s);
     });
@@ -112,14 +110,13 @@ export default function AdminProducts() {
 
     const imgs = Array.isArray(p?.images) && p.images.length ? p.images : [""];
     const specs =
-      Array.isArray(p?.specs) && p.specs.length
-        ? p.specs
-        : [{ key: "", value: "" }];
+      Array.isArray(p?.specs) && p.specs.length ? p.specs : [{ key: "", value: "" }];
 
     setForm({
       title: p?.title || p?.name || "",
       sku: p?.sku || "",
       price: p?.price ?? "",
+      stockQty: p?.stockQty ?? 0, // ✅
       active: typeof p?.active === "boolean" ? p.active : true,
       category: catId || "",
       images: imgs,
@@ -180,10 +177,12 @@ export default function AdminProducts() {
   async function save() {
     const title = form.title.trim();
     const price = Number(form.price);
+    const stockQty = Math.max(0, Number(form.stockQty || 0)); // ✅
 
     if (!title) return alert("Shkruaj titullin.");
-    if (!Number.isFinite(price) || price < 0)
-      return alert("Çmimi nuk është i saktë.");
+    if (!Number.isFinite(price) || price < 0) return alert("Çmimi nuk është i saktë.");
+    if (!Number.isFinite(stockQty) || stockQty < 0)
+      return alert("Sasia nuk është e saktë.");
 
     // clean images (only non-empty)
     const images = (form.images || []).map((x) => x.trim()).filter(Boolean);
@@ -200,6 +199,7 @@ export default function AdminProducts() {
       title,
       sku: (form.sku || "").trim(),
       price,
+      stockQty, // ✅
       active: !!form.active,
       category: form.category || null,
       images,
@@ -248,11 +248,7 @@ export default function AdminProducts() {
             <FiRefreshCcw /> Rifresko
           </button>
 
-          <button
-            className="ap-btn ap-btn-primary"
-            onClick={openCreate}
-            type="button"
-          >
+          <button className="ap-btn ap-btn-primary" onClick={openCreate} type="button">
             <FiPlus /> Shto produkt
           </button>
         </div>
@@ -288,9 +284,7 @@ export default function AdminProducts() {
       ) : filtered.length === 0 ? (
         <div className="ap-empty">
           <div className="ap-empty-title">S’ka produkte.</div>
-          <div className="ap-empty-sub">
-            Shto produktin e parë nga butoni sipër.
-          </div>
+          <div className="ap-empty-sub">Shto produktin e parë nga butoni sipër.</div>
         </div>
       ) : (
         <div className="ap-grid">
@@ -310,9 +304,7 @@ export default function AdminProducts() {
                     </div>
                   )}
                   <div className="ap-badges">
-                    <span
-                      className={p?.active ? "ap-tag ap-on" : "ap-tag ap-off"}
-                    >
+                    <span className={p?.active ? "ap-tag ap-on" : "ap-tag ap-off"}>
                       {p?.active ? "Aktiv" : "Jo aktiv"}
                     </span>
                   </div>
@@ -331,18 +323,16 @@ export default function AdminProducts() {
                   <div className="ap-cat">
                     Kategori:{" "}
                     <b>
-                      {typeof p?.category === "object"
-                        ? p?.category?.name || "—"
-                        : "—"}
+                      {typeof p?.category === "object" ? p?.category?.name || "—" : "—"}
                     </b>
                   </div>
 
+                  <div className="ap-cat">
+                    Stok: <b>{Number.isFinite(Number(p?.stockQty)) ? p.stockQty : 0}</b>
+                  </div>
+
                   <div className="ap-row">
-                    <button
-                      className="ap-btn"
-                      onClick={() => openEdit(p)}
-                      type="button"
-                    >
+                    <button className="ap-btn" onClick={() => openEdit(p)} type="button">
                       <FiEdit2 /> Edit
                     </button>
                     <button
@@ -362,27 +352,15 @@ export default function AdminProducts() {
 
       {/* MODAL */}
       {open ? (
-        <div
-          className="ap-modal-backdrop"
-          onMouseDown={closeModal}
-          role="presentation"
-        >
+        <div className="ap-modal-backdrop" onMouseDown={closeModal} role="presentation">
           <div className="ap-modal" onMouseDown={(e) => e.stopPropagation()}>
             <div className="ap-modal-head">
               <div>
-                <div className="ap-modal-title">
-                  {editing ? "Ndrysho produkt" : "Shto produkt"}
-                </div>
-                <div className="ap-modal-sub">
-                  Fotot me URL + opsione dinamike (specs).
-                </div>
+                <div className="ap-modal-title">{editing ? "Ndrysho produkt" : "Shto produkt"}</div>
+                <div className="ap-modal-sub">Fotot me URL + opsione dinamike (specs) + stok.</div>
               </div>
 
-              <button
-                className="ap-icon-btn"
-                onClick={closeModal}
-                type="button"
-              >
+              <button className="ap-icon-btn" onClick={closeModal} type="button">
                 <FiX />
               </button>
             </div>
@@ -421,7 +399,19 @@ export default function AdminProducts() {
                 </div>
               </div>
 
+              {/* ✅ STOCK + CATEGORY/ACTIVE */}
               <div className="ap-2col">
+                <div className="ap-col">
+                  <label className="ap-label">Sasia (stok)</label>
+                  <input
+                    className="ap-input"
+                    value={form.stockQty}
+                    onChange={(e) => setField("stockQty", e.target.value)}
+                    placeholder="p.sh. 10"
+                    inputMode="numeric"
+                  />
+                </div>
+
                 <div className="ap-col">
                   <label className="ap-label">Kategori</label>
                   <select
@@ -437,7 +427,9 @@ export default function AdminProducts() {
                     ))}
                   </select>
                 </div>
+              </div>
 
+              <div className="ap-2col">
                 <div className="ap-col ap-check">
                   <label className="ap-label">Aktiv</label>
                   <label className="ap-switch">
@@ -457,15 +449,9 @@ export default function AdminProducts() {
                 <div className="ap-block-head">
                   <div>
                     <div className="ap-block-title">Fotot (URL)</div>
-                    <div className="ap-block-sub">
-                      Mund të shtosh sa të duash (URL).
-                    </div>
+                    <div className="ap-block-sub">Mund të shtosh sa të duash (URL).</div>
                   </div>
-                  <button
-                    className="ap-btn"
-                    onClick={addImageRow}
-                    type="button"
-                  >
+                  <button className="ap-btn" onClick={addImageRow} type="button">
                     <FiPlus /> Shto foto
                   </button>
                 </div>
@@ -496,9 +482,7 @@ export default function AdminProducts() {
               <div className="ap-block">
                 <div className="ap-block-head">
                   <div>
-                    <div className="ap-block-title">
-                      Opsione / të dhëna (Specs)
-                    </div>
+                    <div className="ap-block-title">Opsione / të dhëna (Specs)</div>
                     <div className="ap-block-sub">
                       p.sh. RAM=16GB, Ngjyra=E zezë, Material=Pambuk
                     </div>
@@ -536,19 +520,13 @@ export default function AdminProducts() {
                 </div>
 
                 <div className="ap-hint">
-                  Shënim: rreshtat bosh nuk ruhen (ruhen vetëm ata që kanë key +
-                  value).
+                  Shënim: rreshtat bosh nuk ruhen (ruhen vetëm ata që kanë key + value).
                 </div>
               </div>
             </div>
 
             <div className="ap-modal-foot">
-              <button
-                className="ap-btn"
-                onClick={closeModal}
-                type="button"
-                disabled={saving}
-              >
+              <button className="ap-btn" onClick={closeModal} type="button" disabled={saving}>
                 Anulo
               </button>
 
