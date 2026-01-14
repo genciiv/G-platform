@@ -1,4 +1,3 @@
-// client/src/App.jsx
 import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
@@ -21,6 +20,7 @@ import UserLogin from "./pages/User/Login/UserLogin.jsx";
 import UserRegister from "./pages/User/Register/UserRegister.jsx";
 import Account from "./pages/User/Account/Account.jsx";
 import OrderDetails from "./pages/User/Orders/OrderDetails.jsx";
+import UserFavorites from "./pages/User/Account/UserFavorites.jsx"; // ✅ SHTUAR
 
 // ADMIN
 import AdminLogin from "./pages/Admin/Login/AdminLogin.jsx";
@@ -68,6 +68,7 @@ export default function App() {
         {/* USER */}
         <Route path="/user/login" element={<UserLogin />} />
         <Route path="/user/register" element={<UserRegister />} />
+
         <Route
           path="/account"
           element={
@@ -76,6 +77,16 @@ export default function App() {
             </UserGuard>
           }
         />
+
+        <Route
+          path="/account/favorites"
+          element={
+            <UserGuard>
+              <UserFavorites />
+            </UserGuard>
+          }
+        />
+
         <Route
           path="/account/orders/:id"
           element={

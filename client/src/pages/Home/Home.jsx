@@ -1,10 +1,8 @@
-// client/src/pages/Home/Home.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FiTruck,
   FiShield,
-  FiRefreshCcw,
   FiShoppingBag,
   FiSearch,
   FiMapPin,
@@ -16,6 +14,7 @@ import {
 } from "react-icons/fi";
 import { http } from "../../lib/api.js";
 import { useCart } from "../../context/cartContext.jsx";
+import { useFavorites } from "../../context/favoritesContext.jsx";
 import "./home.css";
 
 function money(v) {
@@ -36,7 +35,13 @@ function pickImage(p) {
 }
 
 function normList(res) {
-  return res?.data?.items || res?.data?.products || res?.data?.categories || res?.data || [];
+  return (
+    res?.data?.items ||
+    res?.data?.products ||
+    res?.data?.categories ||
+    res?.data ||
+    []
+  );
 }
 
 function getCategoryIdFromProduct(p) {
@@ -49,7 +54,16 @@ function getCategoryIdFromProduct(p) {
 
 export default function Home() {
   const nav = useNavigate();
-  const { addToCart } = useCart();
+
+  // ✅ cart
+  const cart = useCart();
+  const addToCart =
+    cart?.addToCart ||
+    cart?.add ||
+    ((p) => console.warn("Missing addToCart in cartContext", p));
+
+  // ✅ favorites
+  const { isFav, toggleFav } = useFavorites();
 
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -110,10 +124,12 @@ export default function Home() {
         const fallbackSecs = await buildFallbackSections();
         if (!alive) return;
         setSections(fallbackSecs);
+        if (!fallbackSecs.length) {
+          setErr("S’ka seksione. Aktivizo “Show on Home” te Admin → Kategori.");
+        }
       } catch (e) {
         const status = e?.response?.status;
         try {
-          // ✅ nëse /api/home s’ekziston ose ka problem → fallback
           if (status === 404 || status === 500 || status === 502 || status === 503) {
             const fallbackSecs = await buildFallbackSections();
             if (!alive) return;
@@ -143,7 +159,9 @@ export default function Home() {
   }, []);
 
   function onOpenProduct(p) {
-    nav(`/products/${p._id}`);
+    const id = p?._id || p?.id;
+    if (!id) return;
+    nav(`/products/${id}`);
   }
 
   function onAdd(p) {
@@ -297,7 +315,10 @@ export default function Home() {
       </section>
 
       {sections.map((sec) => (
-        <section className="section" key={sec.category?._id || sec.category?.slug}>
+        <section
+          className="section"
+          key={sec.category?._id || sec.category?.slug}
+        >
           <div className="section-head section-head-row">
             <div>
               <h2>{sec.category?.name || "Kategori"}</h2>
@@ -305,7 +326,9 @@ export default function Home() {
             </div>
 
             <Link
-              to={`/products?category=${encodeURIComponent(sec.category?.slug || "")}`}
+              to={`/products?category=${encodeURIComponent(
+                sec.category?.slug || ""
+              )}`}
               className="mini-link"
             >
               Shiko të gjitha <FiChevronRight />
@@ -319,14 +342,21 @@ export default function Home() {
                   const img = pickImage(p);
                   const title = p?.title || p?.name || "Produkt";
                   const price = p?.price ?? p?.salePrice ?? 0;
+                  const fav = isFav(p);
 
                   return (
-                    <div className="p-card" key={p._id}>
-                      <button
+                    <div className="p-card" key={p._id || p.id}>
+                      {/* ✅ MEDIA: DIV (jo button) */}
+                      <div
                         className="p-media"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => onOpenProduct(p)}
-                        type="button"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") onOpenProduct(p);
+                        }}
                         aria-label="Hap produktin"
+                        style={{ position: "relative" }}
                       >
                         {img ? (
                           <img src={img} alt={title} />
@@ -337,10 +367,37 @@ export default function Home() {
                           </div>
                         )}
 
+                        {/* ✅ Zemra toggle (tani s’është brenda butoni) */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleFav(p);
+                          }}
+                          title="Favourite"
+                          aria-label="Favourite"
+                          style={{
+                            position: "absolute",
+                            top: 10,
+                            right: 10,
+                            width: 40,
+                            height: 40,
+                            borderRadius: 999,
+                            border: "1px solid rgba(0,0,0,0.08)",
+                            background: "white",
+                            display: "grid",
+                            placeItems: "center",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <FiHeart style={{ color: fav ? "#e11d48" : "#111827" }} />
+                        </button>
+
                         <span className="p-badge">
-                          <FiHeart /> {sec.category?.name || "Produkt"}
+                          <FiTag /> {sec.category?.name || "Produkt"}
                         </span>
-                      </button>
+                      </div>
 
                       <div className="p-body">
                         <div className="p-title" title={title}>
@@ -349,7 +406,9 @@ export default function Home() {
 
                         <div className="p-meta">
                           <div className="p-price">{money(price)}</div>
-                          {p?.sku ? <div className="p-sku">SKU: {p.sku}</div> : null}
+                          {p?.sku ? (
+                            <div className="p-sku">SKU: {p.sku}</div>
+                          ) : null}
                         </div>
 
                         <div className="p-actions">

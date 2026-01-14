@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { http } from "../../lib/api.js";
 import { useCart } from "../../context/cartContext.jsx";
+import { useFavorites } from "../../context/favoritesContext.jsx";
 import {
   FiChevronLeft,
   FiShoppingBag,
@@ -9,6 +10,7 @@ import {
   FiMinus,
   FiTag,
   FiStar,
+  FiHeart,
 } from "react-icons/fi";
 import "./productDetails.css";
 
@@ -37,14 +39,27 @@ function getPrice(p) {
   return Number(p?.salePrice ?? p?.price ?? 0);
 }
 
-function getCategory(p) {
-  return (p?.category || p?.categoryName || "").trim();
+function getCategoryKey(p) {
+  const c = p?.category;
+  if (!c) return "";
+  if (typeof c === "string") return c;
+  if (typeof c === "object") return c._id || c.id || c.slug || "";
+  return "";
+}
+
+function getCategoryLabel(p) {
+  const c = p?.category;
+  if (!c) return (p?.categoryName || "").trim();
+  if (typeof c === "string") return (p?.categoryName || c).trim();
+  if (typeof c === "object") return (c.name || c.slug || "").trim();
+  return "";
 }
 
 export default function ProductDetails() {
   const { id } = useParams();
   const nav = useNavigate();
   const cart = useCart();
+  const { isFav, toggleFav } = useFavorites();
 
   const addToCart =
     cart?.addToCart ||
@@ -67,8 +82,9 @@ export default function ProductDetails() {
       setLoading(true);
       setErr("");
       try {
-        // 1) provo endpoint-in direkt
         let p = null;
+
+        // 1) provo endpoint-in direkt
         try {
           const res1 = await http.get(`/api/products/${id}`);
           p = res1.data?.item || res1.data?.product || res1.data || null;
@@ -76,7 +92,7 @@ export default function ProductDetails() {
           p = null;
         }
 
-        // 2) gjithmonë merr listën për "related"
+        // 2) gjithmonë merr listën për related / fallback
         const res2 = await http.get("/api/products");
         const list = res2.data?.items || res2.data?.products || res2.data || [];
         const arr = Array.isArray(list) ? list : [];
@@ -109,9 +125,9 @@ export default function ProductDetails() {
   const images = useMemo(() => pickImages(product), [product]);
 
   const related = useMemo(() => {
-    const cat = getCategory(product);
+    const catKey = getCategoryKey(product);
     const base = all.filter((p) => String(p?._id) !== String(id));
-    let rel = cat ? base.filter((p) => getCategory(p) === cat) : [];
+    let rel = catKey ? base.filter((p) => getCategoryKey(p) === catKey) : [];
     if (rel.length < 4) rel = [...rel, ...base].slice(0, 4);
     return rel.slice(0, 4);
   }, [all, product, id]);
@@ -128,7 +144,6 @@ export default function ProductDetails() {
     try {
       addToCart(product, qty);
     } catch {
-      // fallback
       for (let i = 0; i < qty; i++) addToCart(product);
     }
   }
@@ -161,9 +176,7 @@ export default function ProductDetails() {
         <div className="pd-inner">
           <div className="pd-empty">
             <div className="pd-empty-title">S’u gjet produkti</div>
-            <div className="pd-empty-sub">
-              {err || "Ky produkt nuk ekziston."}
-            </div>
+            <div className="pd-empty-sub">{err || "Ky produkt nuk ekziston."}</div>
             <Link to="/products" className="pd-btn">
               <FiChevronLeft /> Kthehu te produktet
             </Link>
@@ -175,8 +188,9 @@ export default function ProductDetails() {
 
   const title = getTitle(product);
   const price = getPrice(product);
-  const cat = getCategory(product);
+  const catLabel = getCategoryLabel(product);
   const desc = product?.description || product?.desc || "";
+  const fav = isFav(product);
 
   return (
     <main className="pd">
@@ -202,9 +216,10 @@ export default function ProductDetails() {
                   <span>Pa foto</span>
                 </div>
               )}
-              {cat ? (
+
+              {catLabel ? (
                 <span className="pd-badge">
-                  <FiTag /> {cat}
+                  <FiTag /> {catLabel}
                 </span>
               ) : null}
             </div>
@@ -229,11 +244,31 @@ export default function ProductDetails() {
           <div className="pd-right">
             <h1 className="pd-title">{title}</h1>
 
-            <div className="pd-sub">
+            <div className="pd-sub" style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <div className="pd-price">{money(price)}</div>
-              {product?.sku ? (
-                <div className="pd-sku">SKU: {product.sku}</div>
-              ) : null}
+              {product?.sku ? <div className="pd-sku">SKU: {product.sku}</div> : null}
+
+              {/* ✅ Favourite */}
+              <button
+                type="button"
+                onClick={() => toggleFav(product)}
+                title="Favourite"
+                style={{
+                  marginLeft: "auto",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  background: "white",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                <FiHeart style={{ color: fav ? "#e11d48" : "#111827" }} />
+                {fav ? "Në favourite" : "Favourite"}
+              </button>
             </div>
 
             <div className="pd-mini">
@@ -257,12 +292,7 @@ export default function ProductDetails() {
                   className="pd-qtyInput"
                   value={qty}
                   onChange={(e) =>
-                    setQty(
-                      Math.max(
-                        1,
-                        Math.min(99, Number(e.target.value || 1) || 1)
-                      )
-                    )
+                    setQty(Math.max(1, Math.min(99, Number(e.target.value || 1) || 1)))
                   }
                 />
                 <button className="pd-qtyBtn" onClick={inc} type="button">
@@ -272,11 +302,7 @@ export default function ProductDetails() {
             </div>
 
             <div className="pd-actions">
-              <button
-                className="pd-btn pd-btnDark"
-                onClick={addNow}
-                type="button"
-              >
+              <button className="pd-btn pd-btnDark" onClick={addNow} type="button">
                 <FiShoppingBag /> Shto në shportë
               </button>
               <button className="pd-btn" onClick={buyNow} type="button">
@@ -285,8 +311,7 @@ export default function ProductDetails() {
             </div>
 
             <div className="pd-note">
-              Pagesa: Cash on Delivery • Dorëzim në adresë • Gjurmo porosinë me
-              kod + telefon.
+              Pagesa: Cash on Delivery • Dorëzim në adresë • Gjurmo porosinë me kod + telefon.
             </div>
           </div>
         </div>
