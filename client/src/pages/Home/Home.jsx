@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   FiTruck,
   FiShield,
+  FiRefreshCcw,
   FiShoppingBag,
   FiSearch,
   FiMapPin,
@@ -54,15 +55,7 @@ function getCategoryIdFromProduct(p) {
 
 export default function Home() {
   const nav = useNavigate();
-
-  // ✅ cart
-  const cart = useCart();
-  const addToCart =
-    cart?.addToCart ||
-    cart?.add ||
-    ((p) => console.warn("Missing addToCart in cartContext", p));
-
-  // ✅ favorites
+  const { addToCart } = useCart();
   const { isFav, toggleFav } = useFavorites();
 
   const [sections, setSections] = useState([]);
@@ -117,25 +110,31 @@ export default function Home() {
         const res = await http.get("/api/home");
         if (!alive) return;
         const secs = res?.data?.sections || [];
+
         if (Array.isArray(secs) && secs.length) {
           setSections(secs);
           return;
         }
+
         const fallbackSecs = await buildFallbackSections();
         if (!alive) return;
         setSections(fallbackSecs);
-        if (!fallbackSecs.length) {
-          setErr("S’ka seksione. Aktivizo “Show on Home” te Admin → Kategori.");
-        }
       } catch (e) {
         const status = e?.response?.status;
         try {
-          if (status === 404 || status === 500 || status === 502 || status === 503) {
+          if (
+            status === 404 ||
+            status === 500 ||
+            status === 502 ||
+            status === 503
+          ) {
             const fallbackSecs = await buildFallbackSections();
             if (!alive) return;
             setSections(fallbackSecs);
             if (!fallbackSecs.length) {
-              setErr("S’ka seksione. Aktivizo “Show on Home” te Admin → Kategori.");
+              setErr(
+                "S’ka seksione. Aktivizo “Show on Home” te Admin → Kategori."
+              );
             }
           } else {
             setErr("Nuk u morën seksionet e home.");
@@ -159,9 +158,7 @@ export default function Home() {
   }, []);
 
   function onOpenProduct(p) {
-    const id = p?._id || p?.id;
-    if (!id) return;
-    nav(`/products/${id}`);
+    nav(`/products/${p._id}`);
   }
 
   function onAdd(p) {
@@ -220,6 +217,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* HERO CARD */}
           <div className="hero-card">
             <div className="hc-top">
               <div className="hc-title">Si funksionon?</div>
@@ -314,6 +312,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* SECTIONS LIST */}
       {sections.map((sec) => (
         <section
           className="section"
@@ -345,38 +344,33 @@ export default function Home() {
                   const fav = isFav(p);
 
                   return (
-                    <div className="p-card" key={p._id || p.id}>
-                      {/* ✅ MEDIA: DIV (jo button) */}
+                    <div className="p-card" key={p._id}>
+                      {/* ✅ MOS e bëj button brenda button */}
                       <div
-                        className="p-media"
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => onOpenProduct(p)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") onOpenProduct(p);
-                        }}
-                        aria-label="Hap produktin"
+                        className="p-mediaWrap"
                         style={{ position: "relative" }}
                       >
-                        {img ? (
-                          <img src={img} alt={title} />
-                        ) : (
-                          <div className="p-placeholder">
-                            <FiShoppingBag />
-                            <span>Pa foto</span>
-                          </div>
-                        )}
+                        <button
+                          className="p-media"
+                          onClick={() => onOpenProduct(p)}
+                          type="button"
+                          aria-label="Hap produktin"
+                        >
+                          {img ? (
+                            <img src={img} alt={title} />
+                          ) : (
+                            <div className="p-placeholder">
+                              <FiShoppingBag />
+                              <span>Pa foto</span>
+                            </div>
+                          )}
+                        </button>
 
-                        {/* ✅ Zemra toggle (tani s’është brenda butoni) */}
+                        {/* ✅ Zemra toggle (jashtë p-media button) */}
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleFav(p);
-                          }}
+                          onClick={() => toggleFav(p)}
                           title="Favourite"
-                          aria-label="Favourite"
                           style={{
                             position: "absolute",
                             top: 10,
@@ -389,9 +383,12 @@ export default function Home() {
                             display: "grid",
                             placeItems: "center",
                             cursor: "pointer",
+                            zIndex: 5,
                           }}
                         >
-                          <FiHeart style={{ color: fav ? "#e11d48" : "#111827" }} />
+                          <FiHeart
+                            style={{ color: fav ? "#e11d48" : "#111827" }}
+                          />
                         </button>
 
                         <span className="p-badge">
@@ -435,7 +432,9 @@ export default function Home() {
               </div>
             ) : (
               <div className="empty">
-                <div className="empty-title">S’ka produkte në këtë kategori.</div>
+                <div className="empty-title">
+                  S’ka produkte në këtë kategori.
+                </div>
                 <div className="empty-sub">
                   Shto produkte në kategorinë “{sec.category?.name}”.
                 </div>
@@ -447,6 +446,149 @@ export default function Home() {
           </div>
         </section>
       ))}
+
+      {/* FEATURES */}
+      <section className="section">
+        <div className="section-head">
+          <h2>Pse G-App?</h2>
+          <p>Dizajn i pastër, porosi të menaxhuara, dhe gjurmim i thjeshtë.</p>
+        </div>
+
+        <div className="grid-3">
+          <div className="card">
+            <div className="card-ico">
+              <FiShield />
+            </div>
+            <h3>Siguri</h3>
+            <p>
+              Sesion i sigurt, kontroll i aksesit për user dhe admin, dhe pagesë
+              në dorëzim.
+            </p>
+          </div>
+
+          <div className="card">
+            <div className="card-ico">
+              <FiRefreshCcw />
+            </div>
+            <h3>Rifreskim i shpejtë</h3>
+            <p>Produktet, shporta, porositë dhe statuset rifreskohen lehtë.</p>
+          </div>
+
+          <div className="card">
+            <div className="card-ico">
+              <FiTruck />
+            </div>
+            <h3>Gjurmim porosie</h3>
+            <p>Klienti gjurmon me kod + telefon. Admini menaxhon statuset.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* QUICK LINKS */}
+      <section className="section alt">
+        <div className="section-head">
+          <h2>Shkurt & saktë</h2>
+          <p>Zgjidh ku do të shkosh tani.</p>
+        </div>
+
+        <div className="grid-4">
+          <Link to="/products" className="qcard">
+            <div className="qicon">
+              <FiShoppingBag />
+            </div>
+            <div className="qtext">
+              <div className="qtitle">Produkte</div>
+              <div className="qdesc">Shiko listën & detajet.</div>
+            </div>
+            <FiChevronRight className="qchev" />
+          </Link>
+
+          <Link to="/cart" className="qcard">
+            <div className="qicon">
+              <FiShoppingBag />
+            </div>
+            <div className="qtext">
+              <div className="qtitle">Shporta</div>
+              <div className="qdesc">Kontrollo produktet.</div>
+            </div>
+            <FiChevronRight className="qchev" />
+          </Link>
+
+          <Link to="/track" className="qcard">
+            <div className="qicon">
+              <FiTruck />
+            </div>
+            <div className="qtext">
+              <div className="qtitle">Gjurmim</div>
+              <div className="qdesc">Kodi + telefoni.</div>
+            </div>
+            <FiChevronRight className="qchev" />
+          </Link>
+
+          <Link to="/auth" className="qcard">
+            <div className="qicon">
+              <FiPhoneCall />
+            </div>
+            <div className="qtext">
+              <div className="qtitle">Hyr / Regjistrohu</div>
+              <div className="qdesc">User ose Admin.</div>
+            </div>
+            <FiChevronRight className="qchev" />
+          </Link>
+        </div>
+      </section>
+
+      {/* TRUST STRIP */}
+      <section className="trust">
+        <div className="trust-inner">
+          <div className="trust-item">
+            <FiMapPin />
+            <div>
+              <div className="trust-title">Dorëzim në adresë</div>
+              <div className="trust-sub">Shkruaj adresën te checkout.</div>
+            </div>
+          </div>
+
+          <div className="trust-item">
+            <FiCreditCard />
+            <div>
+              <div className="trust-title">Cash on Delivery</div>
+              <div className="trust-sub">Paguaj kur të vijë porosia.</div>
+            </div>
+          </div>
+
+          <div className="trust-item">
+            <FiShield />
+            <div>
+              <div className="trust-title">Status i qartë</div>
+              <div className="trust-sub">Pending / Shipped / Delivered.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="footer">
+        <div className="footer-inner">
+          <div className="f-left">
+            <div className="f-brand">G-App</div>
+            <div className="f-sub">
+              Dyqan modern me porosi dhe gjurmim të thjeshtë.
+            </div>
+          </div>
+
+          <div className="f-links">
+            <Link to="/products">Produkte</Link>
+            <Link to="/track">Gjurmim</Link>
+            <Link to="/cart">Shporta</Link>
+            <Link to="/auth">Hyr / Regjistrohu</Link>
+          </div>
+        </div>
+
+        <div className="f-bottom">
+          © {new Date().getFullYear()} G-App • All rights reserved
+        </div>
+      </footer>
     </main>
   );
 }
