@@ -1,12 +1,11 @@
-// server/src/controllers/userAuthController.js
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 function setTokenCookie(res, payload) {
+  const isProd = process.env.NODE_ENV === "production";
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-  const isProd = process.env.NODE_ENV === "production";
   res.cookie("token", token, {
     httpOnly: true,
     sameSite: isProd ? "none" : "lax",
@@ -20,7 +19,7 @@ function toPublicUser(u) {
   return { _id: String(u._id), name: u.name, email: u.email, role: u.role };
 }
 
-export const registerUser = async (req, res) => {
+export async function registerUser(req, res) {
   try {
     const name = String(req.body?.name || "").trim();
     const email = String(req.body?.email || "")
@@ -30,9 +29,8 @@ export const registerUser = async (req, res) => {
 
     if (!name) return res.status(400).json({ message: "Name is required" });
     if (!email) return res.status(400).json({ message: "Email is required" });
-    if (!password || password.length < 6) {
+    if (!password || password.length < 6)
       return res.status(400).json({ message: "Password min 6 chars" });
-    }
 
     const exists = await User.findOne({ email }).select("_id");
     if (exists)
@@ -56,21 +54,21 @@ export const registerUser = async (req, res) => {
 
     return res.status(201).json({ user: toPublicUser(user) });
   } catch (err) {
-    console.error("❌ registerUser error:", err);
+    console.error("registerUser:", err);
     return res.status(500).json({ message: "Register failed" });
   }
-};
+}
 
-export const loginUser = async (req, res) => {
+export async function loginUser(req, res) {
   try {
     const email = String(req.body?.email || "")
       .trim()
       .toLowerCase();
     const password = String(req.body?.password || "");
 
-    if (!email) return res.status(400).json({ message: "Email is required" });
-    if (!password)
-      return res.status(400).json({ message: "Password is required" });
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
+    }
 
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: "Invalid credentials" });
@@ -78,46 +76,36 @@ export const loginUser = async (req, res) => {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ message: "Invalid credentials" });
 
-    // ✅ user login: roli duhet të jetë user
-    const role = user.role === "admin" ? "admin" : "user";
-
     setTokenCookie(res, {
       id: String(user._id),
-      role,
+      role: user.role || "user",
       email: user.email,
       name: user.name,
     });
 
     return res.json({ user: toPublicUser(user) });
   } catch (err) {
-    console.error("❌ loginUser error:", err);
+    console.error("loginUser:", err);
     return res.status(500).json({ message: "Login failed" });
   }
-};
+}
 
-export const meUser = async (req, res) => {
+export async function meUser(req, res) {
   try {
     const token = req.cookies?.token;
     if (!token) return res.status(401).json({ message: "Unauthorized" });
 
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select("name email role");
     if (!user) return res.status(401).json({ message: "Unauthorized" });
 
     return res.json({ user: toPublicUser(user) });
   } catch (err) {
-    console.error("❌ meUser error:", err);
-    return res.status(500).json({ message: "Failed" });
+    return res.status(401).json({ message: "Unauthorized" });
   }
-};
+}
 
-export const logoutUser = async (req, res) => {
+export async function logoutUser(req, res) {
   const isProd = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
@@ -126,4 +114,4 @@ export const logoutUser = async (req, res) => {
     path: "/",
   });
   return res.json({ ok: true });
-};
+}
