@@ -1,3 +1,4 @@
+// server/src/routes/userAuthRoutes.js
 import { Router } from "express";
 import {
   registerUser,

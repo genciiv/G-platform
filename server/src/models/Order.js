@@ -22,7 +22,7 @@ const orderSchema = new mongoose.Schema(
     // ✅ lidhje me user (opsionale — por kur user është i loguar, ruhet)
     userId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "UserAccount",
+      ref: "User",
       default: null,
       index: true,
     },

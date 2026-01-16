@@ -22,11 +22,13 @@ function pickUser(u) {
 
 export async function getMe(req, res) {
   try {
+    console.log("PROFILE GET req.user:", req.user);
     const id = req.user?.id;
     const u = await User.findById(id);
     if (!u) return res.status(404).json({ message: "Not found" });
     return res.json({ user: pickUser(u) });
-  } catch {
+  } catch (e) {
+    console.log("PROFILE GET error:", e?.message);
     return res.status(500).json({ message: "Server error" });
   }
 }

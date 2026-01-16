@@ -2,15 +2,12 @@
 import jwt from "jsonwebtoken";
 
 function readToken(req) {
-  // 1) cookie token (default)
   const c = req.cookies || {};
+
+  // cookie name UNIK
   if (c.token) return c.token;
 
-  // 2) fallback cookie names
-  if (c.user_token) return c.user_token;
-  if (c.admin_token) return c.admin_token;
-
-  // 3) Authorization header
+  // fallback header
   const h = req.headers?.authorization || "";
   if (h.startsWith("Bearer ")) return h.slice(7);
 
@@ -23,8 +20,9 @@ export function requireAuth(req, res, next) {
     if (!token) return res.status(401).json({ message: "Unauthorized" });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // { id, role, email, name }
-    next();
+    // decoded duhet te kete { id, role, email, name }
+    req.user = decoded;
+    return next();
   } catch (err) {
     return res.status(401).json({ message: "Unauthorized" });
   }
@@ -34,12 +32,12 @@ export function requireAdmin(req, res, next) {
   if (req.user?.role !== "admin") {
     return res.status(403).json({ message: "Forbidden" });
   }
-  next();
+  return next();
 }
 
 export function requireUser(req, res, next) {
   if (req.user?.role !== "user") {
     return res.status(403).json({ message: "Forbidden" });
   }
-  next();
+  return next();
 }

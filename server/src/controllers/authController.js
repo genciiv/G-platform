@@ -6,10 +6,11 @@ import User from "../models/User.js";
 function setTokenCookie(res, payload) {
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "7d" });
 
+  const isProd = process.env.NODE_ENV === "production";
   res.cookie("token", token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: false, // prod me https -> true
+    sameSite: isProd ? "none" : "lax",
+    secure: isProd,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: "/",
   });
@@ -61,12 +62,18 @@ export async function login(req, res) {
     if (!ok) return res.status(400).json({ message: "Invalid credentials" });
 
     // ✅ vetëm admin
-    if (user.role !== "admin") {
+    if (user.role !== "admin")
       return res.status(403).json({ message: "Forbidden" });
-    }
+
+    // ✅ DEBUG
+    console.log("LOGIN ADMIN:", {
+      id: String(user._id),
+      role: user.role,
+      email: user.email,
+    });
 
     setTokenCookie(res, {
-      id: user._id.toString(),
+      id: String(user._id),
       role: "admin",
       email: user.email,
       name: user.name,
@@ -75,7 +82,7 @@ export async function login(req, res) {
     return res.json({
       ok: true,
       admin: {
-        id: user._id,
+        _id: String(user._id),
         email: user.email,
         name: user.name,
         role: "admin",
@@ -87,10 +94,11 @@ export async function login(req, res) {
 }
 
 export async function logout(req, res) {
+  const isProd = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
-    sameSite: "lax",
-    secure: false,
+    sameSite: isProd ? "none" : "lax",
+    secure: isProd,
     path: "/",
   });
   return res.json({ ok: true });

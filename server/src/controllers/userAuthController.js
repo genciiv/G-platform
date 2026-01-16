@@ -1,11 +1,12 @@
+// server/src/controllers/userAuthController.js
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 function setTokenCookie(res, payload) {
-  const isProd = process.env.NODE_ENV === "production";
   const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "7d" });
 
+  const isProd = process.env.NODE_ENV === "production";
   res.cookie("token", token, {
     httpOnly: true,
     sameSite: isProd ? "none" : "lax",
@@ -29,8 +30,9 @@ export async function registerUser(req, res) {
 
     if (!name) return res.status(400).json({ message: "Name is required" });
     if (!email) return res.status(400).json({ message: "Email is required" });
-    if (!password || password.length < 6)
+    if (!password || password.length < 6) {
       return res.status(400).json({ message: "Password min 6 chars" });
+    }
 
     const exists = await User.findOne({ email }).select("_id");
     if (exists)
@@ -45,6 +47,13 @@ export async function registerUser(req, res) {
       role: "user",
     });
 
+    // ✅ DEBUG
+    console.log("REGISTER USER:", {
+      id: String(user._id),
+      role: user.role,
+      email: user.email,
+    });
+
     setTokenCookie(res, {
       id: String(user._id),
       role: "user",
@@ -54,7 +63,7 @@ export async function registerUser(req, res) {
 
     return res.status(201).json({ user: toPublicUser(user) });
   } catch (err) {
-    console.error("registerUser:", err);
+    console.error("❌ registerUser error:", err);
     return res.status(500).json({ message: "Register failed" });
   }
 }
@@ -66,9 +75,9 @@ export async function loginUser(req, res) {
       .toLowerCase();
     const password = String(req.body?.password || "");
 
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
-    }
+    if (!email) return res.status(400).json({ message: "Email is required" });
+    if (!password)
+      return res.status(400).json({ message: "Password is required" });
 
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: "Invalid credentials" });
@@ -76,16 +85,28 @@ export async function loginUser(req, res) {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ message: "Invalid credentials" });
 
+    // ✅ user route lejon vetëm user (jo admin)
+    if (user.role !== "user") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    // ✅ DEBUG
+    console.log("LOGIN USER:", {
+      id: String(user._id),
+      role: user.role,
+      email: user.email,
+    });
+
     setTokenCookie(res, {
       id: String(user._id),
-      role: user.role || "user",
+      role: "user",
       email: user.email,
       name: user.name,
     });
 
     return res.json({ user: toPublicUser(user) });
   } catch (err) {
-    console.error("loginUser:", err);
+    console.error("❌ loginUser error:", err);
     return res.status(500).json({ message: "Login failed" });
   }
 }
@@ -95,13 +116,20 @@ export async function meUser(req, res) {
     const token = req.cookies?.token;
     if (!token) return res.status(401).json({ message: "Unauthorized" });
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     const user = await User.findById(decoded.id).select("name email role");
     if (!user) return res.status(401).json({ message: "Unauthorized" });
 
     return res.json({ user: toPublicUser(user) });
   } catch (err) {
-    return res.status(401).json({ message: "Unauthorized" });
+    console.error("❌ meUser error:", err);
+    return res.status(500).json({ message: "Failed" });
   }
 }
 
