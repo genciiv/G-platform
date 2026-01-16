@@ -1,8 +1,9 @@
+// server/src/models/User.js
 import mongoose from "mongoose";
 
 const addressSchema = new mongoose.Schema(
   {
-    label: { type: String, default: "Shtëpi" }, // p.sh. Shtëpi / Punë
+    label: { type: String, default: "Shtëpi" },
     fullName: { type: String, default: "" },
     phone: { type: String, default: "" },
     country: { type: String, default: "Albania" },
@@ -19,7 +20,7 @@ const addressSchema = new mongoose.Schema(
 
 const prefsSchema = new mongoose.Schema(
   {
-    language: { type: String, default: "sq" }, // sq/en
+    language: { type: String, default: "sq" },
     newsletter: { type: Boolean, default: false },
     orderUpdates: { type: Boolean, default: true },
   },
@@ -28,6 +29,9 @@ const prefsSchema = new mongoose.Schema(
 
 const userSchema = new mongoose.Schema(
   {
+    // ✅ ROLE (shumë e rëndësishme)
+    role: { type: String, enum: ["user", "admin"], default: "user" },
+
     name: { type: String, required: true, trim: true },
     email: {
       type: String,
@@ -36,12 +40,11 @@ const userSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
-    passwordHash: { type: String, default: "" }, // nëse përdor local auth
+    passwordHash: { type: String, default: "" },
     avatar: { type: String, default: "" },
 
-    // Profile data
     phone: { type: String, default: "" },
-    birthday: { type: String, default: "" }, // thjeshtë string (YYYY-MM-DD)
+    birthday: { type: String, default: "" },
     gender: { type: String, default: "" },
     company: { type: String, default: "" },
     vatNumber: { type: String, default: "" },

@@ -5,12 +5,17 @@
   --muted: #6b7280;
   --border: #e5e7eb;
   --card: #ffffff;
-  --shadow: 0 10px 30px rgba(0,0,0,.06);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
   --radius: 14px;
 }
 
-* { box-sizing: border-box; }
-html, body { height: 100%; }
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
 
 body {
   margin: 0;
@@ -19,5 +24,48 @@ body {
   color: var(--text);
 }
 
-a { color: inherit; text-decoration: none; }
-button, input { font: inherit; }
+a {
+  color: inherit;
+  text-decoration: none;
+}
+button,
+input {
+  font: inherit;
+}
+
+/* ==== SAFE BUTTON BASE (fix “bosh” buttons) ==== */
+button,
+.btn {
+  color: inherit;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #111827;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #111827;
+  border-color: #111827;
+  color: #fff;
+}
+
+.btn-ghost {
+  background: #fff;
+  border-color: #e5e7eb;
+  color: #111827;
+}

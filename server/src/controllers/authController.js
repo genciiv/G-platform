@@ -1,3 +1,4 @@
+// server/src/controllers/authController.js
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
@@ -10,10 +11,10 @@ function setTokenCookie(res, payload) {
     sameSite: "lax",
     secure: false, // prod me https -> true
     maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
   });
 }
 
-// ✅ SEED / RESET ADMIN: krijon ose e përditëson password-in nëse ekziston
 export async function adminSeed(req, res) {
   try {
     const name = process.env.ADMIN_NAME || "Admin";
@@ -21,7 +22,9 @@ export async function adminSeed(req, res) {
     const password = process.env.ADMIN_PASSWORD || "";
 
     if (!email || !password) {
-      return res.status(400).json({ message: "ADMIN_EMAIL/ADMIN_PASSWORD missing in .env" });
+      return res
+        .status(400)
+        .json({ message: "ADMIN_EMAIL/ADMIN_PASSWORD missing in .env" });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -57,16 +60,26 @@ export async function login(req, res) {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(400).json({ message: "Invalid credentials" });
 
+    // ✅ vetëm admin
+    if (user.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
     setTokenCookie(res, {
       id: user._id.toString(),
-      role: user.role,
+      role: "admin",
       email: user.email,
       name: user.name,
     });
 
     return res.json({
       ok: true,
-      admin: { id: user._id, email: user.email, name: user.name, role: user.role },
+      admin: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: "admin",
+      },
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -74,7 +87,12 @@ export async function login(req, res) {
 }
 
 export async function logout(req, res) {
-  res.clearCookie("token", { httpOnly: true, sameSite: "lax", secure: false });
+  res.clearCookie("token", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: false,
+    path: "/",
+  });
   return res.json({ ok: true });
 }
 
